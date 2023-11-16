@@ -6,9 +6,9 @@
 # @LastEditTime : 2023/5/20 22:31
 # @File         : data_show.py
 import SimpleITK as sitk
-import numpy as np
-import cv2
-import os
+# import numpy as np
+# import cv2
+# import os
 
 path = "data/0517/原序列/1V/"
 #
