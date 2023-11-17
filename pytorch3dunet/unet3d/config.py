@@ -9,10 +9,11 @@ logger = utils.get_logger('ConfigLoader')
 
 
 def load_config():
-    parser = argparse.ArgumentParser(description='UNet3D')
-    parser.add_argument('--config', type=str, help='Path to the YAML config file', required=True)
-    args = parser.parse_args()
-    config = yaml.safe_load(open(args.config, 'r'))
+    # parser = argparse.ArgumentParser(description='UNet3D')
+    # parser.add_argument('--config', type=str, help='Path to the YAML config file', required=True)
+    # args = parser.parse_args()
+    # config = yaml.safe_load(open(args.config, 'r'))
+    config = yaml.safe_load(open('pytorch3dunet/config/train_config.yaml', 'r'))
 
     device = config.get('device', None)
     if device == 'cpu':

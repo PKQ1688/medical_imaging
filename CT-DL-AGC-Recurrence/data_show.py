@@ -1,34 +1,60 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 # @Time         : 2023/5/20 22:31
-# @Author       : ztn8btc
+# @Author       : ztn
 # @Email        : zhutn@8btc.com
 # @LastEditTime : 2023/5/20 22:31
-# @File         : data_show.py
-import SimpleITK as sitk
-# import numpy as np
-# import cv2
-# import os
+# @File         : data_show.pyimport os
+import os
 
-path = "data/0517/原序列/1V/"
-#
-reader = sitk.ImageSeriesReader()
-dicom_names = reader.GetGDCMSeriesFileNames(path)
-reader.SetFileNames(dicom_names)
-image = reader.Execute()
-image_array = sitk.GetArrayFromImage(image)     # (z,y,x): z:切片数量,y:切片宽,x:切片高
+import nibabel as nib
+# import matplotlib.pyplot as plt
+import numpy as np
+import pydicom
+from mayavi import mlab
 
-print(image_array.shape)
-print(image_array)
-# label_file = "data/0517/勾画/1V_Merge.nii.gz"
+pydicom.config.image_handlers = ["gdcm", "pylibjpeg"]
 
 
-# def read_img(path):
-#     img = sitk.ReadImage(path)
-#     data = sitk.GetArrayFromImage(img)
-#     print(data.shape)
-#     print(data)
-#     return data
-#
-#
-# read_img(label_file)
+def load_scan(directory):
+    # 加载所有DICOM文件
+    files = [
+        pydicom.dcmread(os.path.join(directory, f))
+        for f in os.listdir(directory)
+        if f.endswith(".dcm")
+    ]
+    # 按照Instance Number排序
+    files.sort(key=lambda x: int(x.InstanceNumber))
+    # 从DICOM文件中提取图像数据
+    return np.stack([s.pixel_array for s in files])
+
+
+def load_nii_to_numpy(file_path):
+    # 加载nii.gz文件
+    nii_data = nib.load(file_path)
+
+    # 转换为numpy数组
+    image_data = nii_data.get_fdata()
+
+    return np.array(image_data)
+
+
+def plot_3d(image_3d):
+    # 创建一个新的场景
+    mlab.figure(bgcolor=(0, 0, 0), size=(800, 800))
+
+    # 添加体数据源
+    src = mlab.pipeline.scalar_field(image_3d)
+
+    # 使用体渲染的方式可视化数据
+    mlab.pipeline.volume(src, vmin=0, vmax=np.max(image_3d))
+
+    # 启动可视化界面
+    mlab.show()
+
+
+if __name__ == "__main__":
+    # image = load_scan("data/胃癌化疗150/原图150/1V")
+    image = load_nii_to_numpy("data/胃癌化疗150/ROI/1V_Merge.nii.gz")
+    print(image.shape)
+    plot_3d(image)
