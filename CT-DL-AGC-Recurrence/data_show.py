@@ -54,7 +54,7 @@ def plot_3d(image_3d):
 
 
 if __name__ == "__main__":
-    # image = load_scan("data/胃癌化疗150/原图150/1V")
-    image = load_nii_to_numpy("data/胃癌化疗150/ROI/1V_Merge.nii.gz")
+    image = load_scan("data/胃癌化疗150/原图150/1V")
+    # image = load_nii_to_numpy("data/monai_spleen/Task09_Spleen/imagesTr/._spleen_2.nii.gz")
     print(image.shape)
     plot_3d(image)
