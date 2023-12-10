@@ -1,10 +1,7 @@
-radiomics
-SimpleITK
 opencv-python
-torch
-pyyaml
 tqdm
-h5py
 pydicom
 monai
-lightning
+nibabel
+Pillow
+matplotlib

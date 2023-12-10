@@ -1,10 +1,4 @@
 #!/usr/bin/env python
-# -*- coding: utf-8 -*-
-# @Time         : 2023/5/20 22:31
-# @Author       : ztn
-# @Email        : zhutn@8btc.com
-# @LastEditTime : 2023/5/20 22:31
-# @File         : data_show.pyimport os
 import os
 
 import nibabel as nib
