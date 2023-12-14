@@ -1,12 +1,18 @@
 import os
-import pydicom
-import numpy as np
+
 import nibabel as nib
+import numpy as np
+import pydicom
+
 
 def convert_dicom_to_nifti(dicom_folder, output_file):
     # 读取 DICOM 文件
-    files = [pydicom.dcmread(os.path.join(dicom_folder, f)) for f in os.listdir(dicom_folder) if f.endswith('.dcm')]
-    
+    files = [
+        pydicom.dcmread(os.path.join(dicom_folder, f))
+        for f in os.listdir(dicom_folder)
+        if f.endswith(".dcm")
+    ]
+
     # 按照切片位置排序文件
     files.sort(key=lambda x: float(x.ImagePositionPatient[2]))
 
@@ -18,9 +24,9 @@ def convert_dicom_to_nifti(dicom_folder, output_file):
 
     # 获取 DICOM 中的仿射矩阵信息
     affine = np.eye(4)
-    affine[0,0] = files[0].PixelSpacing[0]
-    affine[1,1] = files[0].PixelSpacing[1]
-    affine[2,2] = files[0].SliceThickness
+    affine[0, 0] = files[0].PixelSpacing[0]
+    affine[1, 1] = files[0].PixelSpacing[1]
+    affine[2, 2] = files[0].SliceThickness
 
     # 创建 NIfTI 图像
     nifti_image = nib.Nifti1Image(image_data, affine)
@@ -28,8 +34,10 @@ def convert_dicom_to_nifti(dicom_folder, output_file):
     # 保存为 .nii.gz
     nib.save(nifti_image, output_file)
 
+
 # 使用示例
 # convert_dicom_to_nifti('data1207/origin_data/00189740V', 'data1207/origin_data/00189740V.nii.gz')
+
 
 def process_all_dicom_folders(base_folder):
     for folder_name in os.listdir(base_folder):
@@ -42,4 +50,5 @@ def process_all_dicom_folders(base_folder):
             except Exception as e:
                 print(f"Failed to convert {folder_path}: {e}")
 
-process_all_dicom_folders('data1207/origin_data')
+
+process_all_dicom_folders("data1207/origin_data")
