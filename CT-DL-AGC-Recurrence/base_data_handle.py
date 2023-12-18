@@ -1,54 +1,73 @@
 import os
 
+import SimpleITK as sitk
 import nibabel as nib
 import numpy as np
 import pydicom
 
 
-def convert_dicom_to_nifti(dicom_folder, output_file):
-    # 读取 DICOM 文件
-    files = [
-        pydicom.dcmread(os.path.join(dicom_folder, f))
-        for f in os.listdir(dicom_folder)
-        if f.endswith(".dcm")
-    ]
+def save_dicon_data(dicom_dir, save_path):
+    # 读取DICOM图像
+    reader = sitk.ImageSeriesReader()
+    dicom_names = reader.GetGDCMSeriesFileNames(dicom_dir)
+    reader.SetFileNames(dicom_names)
+    image = reader.Execute()
+    # 将图像保存为NIfTI格式
+    sitk.WriteImage(image, save_path)
 
-    # 按照切片位置排序文件
+
+def load_dicom_series(directory):
+    """ 读取DICOM序列并重新定向为RAI方向 """
+    files = [pydicom.dcmread(os.path.join(directory, f)) for f in os.listdir(directory) if f.endswith('.dcm')]
     files.sort(key=lambda x: float(x.ImagePositionPatient[2]))
-
     # 从 DICOM 文件中提取扫描数据
-    image_data = np.stack([file.pixel_array for file in files], axis=-1)
-
-    # 转换数据类型
-    image_data = image_data.astype(np.int16)
-
-    # 获取 DICOM 中的仿射矩阵信息
-    affine = np.eye(4)
-    affine[0, 0] = files[0].PixelSpacing[0]
-    affine[1, 1] = files[0].PixelSpacing[1]
-    affine[2, 2] = files[0].SliceThickness
-
-    # 创建 NIfTI 图像
-    nifti_image = nib.Nifti1Image(image_data, affine)
-
-    # 保存为 .nii.gz
-    nib.save(nifti_image, output_file)
+    # return np.stack([file.pixel_array for file in files],axis=-1)
+    image_stack = np.stack([file.pixel_array for file in files], axis=-1)
+    # RAS到RAI的转换，仅需要沿着Z轴翻转
+    # image_stack = np.flip(image_stack, axis=0)
+    image_stack = np.flip(image_stack, axis=1)
+    # image_stack = np.flip(image_stack, axis=2)
+    image_stack_rotated = np.rot90(image_stack, k=1, axes=(0, 1))
+    return image_stack_rotated
 
 
-# 使用示例
-# convert_dicom_to_nifti('data1207/origin_data/00189740V', 'data1207/origin_data/00189740V.nii.gz')
+def convert_dicom_to_nifti(dicom_series, output_path):
+    """ 将DICOM序列转换为NIfTI格式 """
+    data = dicom_series.astype(np.int16)
+    img = nib.Nifti1Image(data, np.eye(4))
+    nib.save(img, output_path)
 
 
-def process_all_dicom_folders(base_folder):
-    for folder_name in os.listdir(base_folder):
-        folder_path = os.path.join(base_folder, folder_name)
-        if os.path.isdir(folder_path):
-            output_file = os.path.join(base_folder, f"{folder_name}.nii.gz")
-            print(f"Converting {folder_path} to {output_file}")
-            try:
-                convert_dicom_to_nifti(folder_path, output_file)
-            except Exception as e:
-                print(f"Failed to convert {folder_path}: {e}")
+def handel_dir_dicom(dicom_dir, nifti_path):
+    for file_name in os.listdir(dicom_dir):
+        dicom_path_dir = os.path.join(dicom_dir, file_name)
+        # dicom_series = load_dicom_series(dicom_path_dir)
+        nifti_output_path = os.path.join(nifti_path, file_name + '.nii.gz')
+        # convert_dicom_to_nifti(dicom_series, nifti_output_path)
+        save_dicon_data(dicom_path_dir, nifti_output_path)
 
 
-process_all_dicom_folders("data1207/origin_data")
+def convert_rai_to_lpi(input_file_path, output_file_path):
+    for file_name in os.listdir(input_file_path):
+        input_file = os.path.join(input_file_path, file_name)
+        img = nib.load(input_file)
+        data = img.get_fdata()
+
+        # No change needed for I to I
+        converted_data = np.flip(data, (0, 1))
+        new_affine = img.affine.copy()
+        new_affine[0, :] *= -1  # Flip X-axis
+        new_affine[1, :] *= -1  # Flip Y-axi
+
+        # Create a new Nifti1Image with the converted data
+        converted_img = nib.Nifti1Image(converted_data, new_affine)
+
+        # Save the converted image
+        nib.save(converted_img, os.path.join(output_file_path, file_name))
+
+
+if __name__ == '__main__':
+    _dicom_dir = '/Users/zhutaonan/Downloads/data1207/复发验证集-V120/'
+    _nifti_path = 'data/data1207/origin_data'
+    handel_dir_dicom(_dicom_dir, _nifti_path)
+    # convert_rai_to_lpi("data/data1207/roi_data", "data/data1207/roi_ras")

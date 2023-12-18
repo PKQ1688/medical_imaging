@@ -5,3 +5,5 @@ monai
 nibabel
 Pillow
 matplotlib
+aim
+SimpleITK
