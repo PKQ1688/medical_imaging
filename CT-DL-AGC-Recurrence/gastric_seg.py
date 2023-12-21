@@ -7,11 +7,11 @@
 # @File         : gastric_seg.py
 import glob
 import os
-from loguru import logger
 
 import aim
 import torch
 from aim.pytorch import track_gradients_dists, track_params_dists
+from loguru import logger
 from monai.data import DataLoader, CacheDataset, decollate_batch
 from monai.inferers import sliding_window_inference
 from monai.losses import DiceLoss
@@ -40,19 +40,19 @@ def load_data(data_dir):
     Loads data from a local file
     """
     # 读取本地文件
-    # train_images = sorted(glob.glob(os.path.join(data_dir, "origin_data", "*.nii.gz")))
-    # train_labels = sorted(glob.glob(os.path.join(data_dir, "roi_data", "*.nii.gz")))
+    train_images = sorted(glob.glob(os.path.join(data_dir, "origin_data", "*.nii.gz")))
+    train_labels = sorted(glob.glob(os.path.join(data_dir, "roi_data", "*.nii.gz")))
 
-    train_images = sorted(glob.glob(os.path.join(data_dir, "imagesTr", "*.nii.gz")))
-    train_labels = sorted(glob.glob(os.path.join(data_dir, "labelsTr", "*.nii.gz")))
+    # train_images = sorted(glob.glob(os.path.join(data_dir, "imagesTr", "*.nii.gz")))
+    # train_labels = sorted(glob.glob(os.path.join(data_dir, "labelsTr", "*.nii.gz")))
 
     data_dicts = [
         {"image": image_name, "label": label_name}
         for image_name, label_name in zip(train_images, train_labels)
     ]
     # print(len(data_dicts))
-    # train_files, val_files = data_dicts[:-20], data_dicts[-20:]
-    train_files, val_files = data_dicts[:2], data_dicts[2:3]
+    train_files, val_files = data_dicts[:-20], data_dicts[-20:]
+    # train_files, val_files = data_dicts[:2], data_dicts[2:3]
     return train_files, val_files
 
 
@@ -75,14 +75,14 @@ def data_transforms():
             Orientationd(keys=["image", "label"], axcodes="RAI"),
             Spacingd(
                 keys=["image", "label"],
-                pixdim=(1.5, 1.5, 2.0),
+                pixdim=(1.5, 1.5, 0.5),
                 mode=("bilinear", "nearest"),
             ),
             RandCropByPosNegLabeld(
                 keys=["image", "label"],
                 label_key="label",
-                spatial_size=(96, 96, 96),
-                # spatial_size=(10, 10, 10),
+                # spatial_size=(96, 96, 96),
+                spatial_size=(96, 96, 16),
                 pos=1,
                 neg=1,
                 num_samples=4,
@@ -382,8 +382,8 @@ def train(train_loader, val_loader, train_ds, val_ds, aim_run):
 def run_pipeline():
     set_determinism(seed=0)
 
-    # data_dir = "data/data1207"
-    data_dir = "data/Task09_Spleen"
+    data_dir = "data/data1207"
+    # data_dir = "data/Task09_Spleen"
     train_files, val_files = load_data(data_dir)
     train_transforms, val_transforms = data_transforms()
     logger.info(train_files)
