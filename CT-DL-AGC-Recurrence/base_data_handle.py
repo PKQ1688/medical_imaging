@@ -1,6 +1,7 @@
 import os
 
 import SimpleITK as sitk
+from tqdm import tqdm
 
 
 # 读取示例 nii.gz 文件
@@ -31,11 +32,13 @@ def convert_dicom_to_nifti(dicom_directory, output_file, affine, voxel_spacing):
 
 
 def handle_all_data(origin_dicom_path, roi_data_path, output_data_path):
+    if not os.path.exists(output_data_path):
+        os.mkdir(output_data_path)
     # 读取示例 nii.gz 文件
     dicom_list = sorted(os.listdir(origin_dicom_path))
     roi_list = sorted(os.listdir(roi_data_path))
 
-    for dicom_directory, example_nii_path in zip(dicom_list, roi_list):
+    for dicom_directory, example_nii_path in tqdm(zip(dicom_list, roi_list), total=len(dicom_list)):
         # print(dicom_directory)
         # print(example_nii_path)
 
@@ -56,8 +59,9 @@ def handle_all_data(origin_dicom_path, roi_data_path, output_data_path):
 
 
 if __name__ == "__main__":
+    data_num = 1535
     handle_all_data(
-        origin_dicom_path="data/data1207/origin_dicom",
-        roi_data_path="data/data1207/roi_data",
-        output_data_path="data/data1207/origin_data",
+        origin_dicom_path=f"data/ct_data_all/{data_num}/data{data_num}",
+        roi_data_path=f"data/ct_data_all/{data_num}/roi{data_num}",
+        output_data_path=f"data/ct_data_all/{data_num}/original_data{data_num}",
     )
