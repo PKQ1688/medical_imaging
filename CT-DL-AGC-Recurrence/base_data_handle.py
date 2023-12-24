@@ -1,20 +1,34 @@
 import os
+import re
 
 import SimpleITK as sitk
+from loguru import logger
+# import nibabel as nib
+# import numpy as np
+# import pydicom
 from tqdm import tqdm
 
 
 # 读取示例 nii.gz 文件
 def read_nii(file_path):
+    # 使用simpleitk读取nii.gz文件
+    # logger.info(f"read nii file: {file_path}")
     nii_image = sitk.ReadImage(file_path)
     affine = nii_image.GetDirection()
     voxel_spacing = nii_image.GetSpacing()
     return affine, voxel_spacing
 
+    # # 使用nibabel读取nii.gz文件
+    # nii_image = nib.load(file_path)
+    # affine = nii_image.affine
+    # voxel_spacing = nii_image.header.get_zooms()[:3]
+    # return affine, voxel_spacing
+
 
 # 转换 DICOM 到 NIfTI
-def convert_dicom_to_nifti(dicom_directory, output_file, affine, voxel_spacing):
+def convert_dicom_to_nifti_v1(dicom_directory, output_file, affine, voxel_spacing):
     reader = sitk.ImageSeriesReader()
+    # dicom_names = reader.GetGDCMSeriesFileNames(dicom_directory)
     dicom_names = reader.GetGDCMSeriesFileNames(dicom_directory)
     reader.SetFileNames(dicom_names)
 
@@ -23,6 +37,28 @@ def convert_dicom_to_nifti(dicom_directory, output_file, affine, voxel_spacing):
     image.SetSpacing(voxel_spacing)
 
     sitk.WriteImage(image, output_file, True)  # True for compressing to .nii.gz
+
+
+# 转换 DICOM 到 NIfTI
+# def convert_dicom_to_nifti_v2(dicom_directory, output_file, affine, voxel_spacing):
+#     # 读取所有DICOM文件
+#     dicom_files = [
+#         os.path.join(dicom_directory, f)
+#         for f in os.listdir(dicom_directory)
+#         if f.endswith(".dcm")
+#     ]
+#     dicom_files.sort()  # 确保文件是有序的
+#
+#     # 读取DICOM文件的像素数据
+#     pixel_arrays = [pydicom.dcmread(f).pixel_array for f in dicom_files]
+#     volume = np.stack(pixel_arrays, axis=-1)
+#
+#     # 创建NIfTI图像
+#     nii_image = nib.Nifti1Image(volume, affine)
+#     nii_image.header.set_zooms(voxel_spacing + (nii_image.header.get_zooms()[3],))
+#
+#     # 保存NIfTI图像
+#     nib.save(nii_image, output_file)
 
 
 # 示例文件路径
@@ -38,9 +74,20 @@ def handle_all_data(origin_dicom_path, roi_data_path, output_data_path):
     dicom_list = sorted(os.listdir(origin_dicom_path))
     roi_list = sorted(os.listdir(roi_data_path))
 
-    for dicom_directory, example_nii_path in tqdm(zip(dicom_list, roi_list), total=len(dicom_list)):
+    dicom_list.remove(".DS_Store")
+    # roi_list.remove(".DS_Store")
+
+    for dicom_directory, example_nii_path in tqdm(
+            zip(dicom_list, roi_list), total=len(dicom_list)
+    ):
         # print(dicom_directory)
         # print(example_nii_path)
+
+        pattern = r'\d+'  # 匹配一个或多个数字
+        dicom_num = re.findall(pattern, dicom_directory)
+        example_num = re.findall(pattern, example_nii_path)
+
+        assert dicom_num == example_num
 
         # 读取示例文件的属性
         example_affine, example_voxel_spacing = read_nii(
@@ -49,7 +96,9 @@ def handle_all_data(origin_dicom_path, roi_data_path, output_data_path):
 
         output_directory = os.path.join(output_data_path, example_nii_path)
         # # 转换并调整新 NIfTI 文件以匹配示例文件
-        convert_dicom_to_nifti(
+        logger.info(f"\ndicom_directory:{dicom_directory}")
+        logger.info(f"example_nii_path:{example_nii_path}")
+        convert_dicom_to_nifti_v1(
             os.path.join(origin_dicom_path, dicom_directory),
             output_directory,
             example_affine,
@@ -59,7 +108,7 @@ def handle_all_data(origin_dicom_path, roi_data_path, output_data_path):
 
 
 if __name__ == "__main__":
-    data_num = 1535
+    data_num = 275
     handle_all_data(
         origin_dicom_path=f"data/ct_data_all/{data_num}/data{data_num}",
         roi_data_path=f"data/ct_data_all/{data_num}/roi{data_num}",
