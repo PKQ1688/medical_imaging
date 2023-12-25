@@ -3,6 +3,7 @@ import re
 
 import SimpleITK as sitk
 from loguru import logger
+
 # import nibabel as nib
 # import numpy as np
 # import pydicom
@@ -73,17 +74,31 @@ def handle_all_data(origin_dicom_path, roi_data_path, output_data_path):
     # 读取示例 nii.gz 文件
     dicom_list = sorted(os.listdir(origin_dicom_path))
     roi_list = sorted(os.listdir(roi_data_path))
+    logger.info(len(roi_list))
+    logger.info(len(dicom_list))
+    # roi_list = roi_list[:30]
 
-    dicom_list.remove(".DS_Store")
+    # dicom_list.remove(".DS_Store")
     # roi_list.remove(".DS_Store")
 
-    for dicom_directory, example_nii_path in tqdm(
-            zip(dicom_list, roi_list), total=len(dicom_list)
-    ):
+    # for dicom_directory, example_nii_path in tqdm(
+    #         zip(dicom_list, roi_list), total=len(dicom_list)
+    # ):
+    # for dicom_directory in tqdm(dicom_list,total=len(dicom_list)):
+    for example_nii_path in tqdm(roi_list, total=len(roi_list)):
+        # example_nii_path = dicom_directory.replace("V", "") + "_Merge.nii.gz"
+        dicom_directory_v1 = example_nii_path.replace("_Merge.nii.gz", "") + "V"
+        dicom_directory_v2 = example_nii_path.replace("_Merge.nii.gz", "")
         # print(dicom_directory)
         # print(example_nii_path)
+        if dicom_directory_v1 in dicom_list:
+            dicom_directory = dicom_directory_v1
+        elif dicom_directory_v2 in dicom_list:
+            dicom_directory = dicom_directory_v2
+        else:
+            logger.error(f"dicom_directory:{dicom_directory_v1} not in dicom_list")
 
-        pattern = r'\d+'  # 匹配一个或多个数字
+        pattern = r"\d+"  # 匹配一个或多个数字
         dicom_num = re.findall(pattern, dicom_directory)
         example_num = re.findall(pattern, example_nii_path)
 
@@ -96,7 +111,7 @@ def handle_all_data(origin_dicom_path, roi_data_path, output_data_path):
 
         output_directory = os.path.join(output_data_path, example_nii_path)
         # # 转换并调整新 NIfTI 文件以匹配示例文件
-        logger.info(f"\ndicom_directory:{dicom_directory}")
+        logger.info(f"dicom_directory:{dicom_directory}")
         logger.info(f"example_nii_path:{example_nii_path}")
         convert_dicom_to_nifti_v1(
             os.path.join(origin_dicom_path, dicom_directory),
@@ -108,9 +123,8 @@ def handle_all_data(origin_dicom_path, roi_data_path, output_data_path):
 
 
 if __name__ == "__main__":
-    data_num = 275
     handle_all_data(
-        origin_dicom_path=f"data/ct_data_all/{data_num}/data{data_num}",
-        roi_data_path=f"data/ct_data_all/{data_num}/roi{data_num}",
-        output_data_path=f"data/ct_data_all/{data_num}/original_data{data_num}",
+        origin_dicom_path=f"data/ori_dcm",
+        roi_data_path=f"data/roi/",
+        output_data_path=f"data/ori_data",
     )

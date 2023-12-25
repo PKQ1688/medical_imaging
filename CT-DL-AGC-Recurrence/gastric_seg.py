@@ -12,7 +12,13 @@ import aim
 import torch
 from aim.pytorch import track_gradients_dists, track_params_dists
 from loguru import logger
-from monai.data import DataLoader, CacheDataset, decollate_batch
+from monai.data import (
+    DataLoader,
+    CacheDataset,
+    decollate_batch,
+    IterableDataset,
+    Dataset,
+)
 from monai.inferers import sliding_window_inference
 from monai.losses import DiceLoss
 from monai.metrics import DiceMetric
@@ -40,8 +46,8 @@ def load_data(data_dir):
     Loads data from a local file
     """
     # 读取本地文件
-    train_images = sorted(glob.glob(os.path.join(data_dir, "origin_data", "*.nii.gz")))
-    train_labels = sorted(glob.glob(os.path.join(data_dir, "roi_data", "*.nii.gz")))
+    train_images = sorted(glob.glob(os.path.join(data_dir, "ori_data", "*.nii.gz")))
+    train_labels = sorted(glob.glob(os.path.join(data_dir, "roi", "*.nii.gz")))
 
     # train_images = sorted(glob.glob(os.path.join(data_dir, "imagesTr", "*.nii.gz")))
     # train_labels = sorted(glob.glob(os.path.join(data_dir, "labelsTr", "*.nii.gz")))
@@ -51,7 +57,7 @@ def load_data(data_dir):
         for image_name, label_name in zip(train_images, train_labels)
     ]
     # print(len(data_dicts))
-    train_files, val_files = data_dicts[:-20], data_dicts[-20:]
+    train_files, val_files = data_dicts[:-200], data_dicts[-200:]
     # train_files, val_files = data_dicts[:2], data_dicts[2:3]
     return train_files, val_files
 
@@ -308,8 +314,8 @@ def train(train_loader, val_loader, train_ds, val_ds, aim_run):
 
                     # tracking input, label and output images with Aim
                     output = torch.argmax(val_outputs, dim=1)[
-                             0, :, :, slice_to_track
-                             ].float()
+                        0, :, :, slice_to_track
+                    ].float()
 
                     aim_run.track(
                         aim.Image(
@@ -381,22 +387,24 @@ def train(train_loader, val_loader, train_ds, val_ds, aim_run):
 
 def run_pipeline():
     set_determinism(seed=0)
-
-    data_dir = "data/data1207"
+    # data_dir = "data/data1207"
+    data_dir = "data/"
     # data_dir = "data/Task09_Spleen"
     train_files, val_files = load_data(data_dir)
     train_transforms, val_transforms = data_transforms()
     logger.info(train_files)
 
-    train_ds = CacheDataset(
-        data=train_files, transform=train_transforms, cache_rate=1.0, num_workers=4
-    )
-    train_loader = DataLoader(train_ds, batch_size=2, shuffle=True, num_workers=4)
+    # train_ds = CacheDataset(
+    #     data=train_files, transform=train_transforms, cache_rate=0.05, num_workers=0
+    # )
+    train_ds = Dataset(data=train_files, transform=train_transforms)
+    train_loader = DataLoader(train_ds, batch_size=32, shuffle=True, num_workers=0)
 
-    val_ds = CacheDataset(
-        data=val_files, transform=val_transforms, cache_rate=1.0, num_workers=4
-    )
-    val_loader = DataLoader(val_ds, batch_size=1, num_workers=4)
+    # val_ds = CacheDataset(
+    #     data=val_files, transform=val_transforms, cache_rate=0.05, num_workers=0
+    # )
+    val_ds = Dataset(data=val_files, transform=val_transforms)
+    val_loader = DataLoader(val_ds, batch_size=1, num_workers=0)
 
     # initialize a new Aim Run
     aim_run = aim.Run()
