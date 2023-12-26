@@ -23,7 +23,7 @@ from monai.inferers import sliding_window_inference
 from monai.losses import DiceLoss
 from monai.metrics import DiceMetric
 from monai.networks.layers import Norm
-from monai.networks.nets import UNet
+from monai.networks.nets import UNet, UNETR
 from monai.transforms import (
     AsDiscrete,
     EnsureChannelFirstd,
@@ -38,7 +38,7 @@ from monai.transforms import (
 from monai.utils import set_determinism
 
 # device = torch.device("cuda:0")
-device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
 def load_data(data_dir):
@@ -57,8 +57,8 @@ def load_data(data_dir):
         for image_name, label_name in zip(train_images, train_labels)
     ]
     # print(len(data_dicts))
-    train_files, val_files = data_dicts[:-200], data_dicts[-200:]
-    # train_files, val_files = data_dicts[:2], data_dicts[2:3]
+    # train_files, val_files = data_dicts[:-200], data_dicts[-200:]
+    train_files, val_files = data_dicts[:100], data_dicts[100:150]
     return train_files, val_files
 
 
@@ -198,17 +198,35 @@ def data_transforms():
 
 
 def get_model():
-    UNet_metadata = {
-        "spatial_dims": 3,
+    # UNet_metadata = {
+    #     "spatial_dims": 3,
+    #     "in_channels": 1,
+    #     "out_channels": 2,
+    #     "channels": (16, 32, 64, 128, 256),
+    #     "strides": (2, 2, 2, 2),
+    #     "num_res_units": 2,
+    #     "norm": Norm.BATCH,
+    # }
+
+    # model = UNet(**UNet_metadata).to(device)
+
+    UNETR_metadata = {
         "in_channels": 1,
         "out_channels": 2,
-        "channels": (16, 32, 64, 128, 256),
-        "strides": (2, 2, 2, 2),
-        "num_res_units": 2,
-        "norm": Norm.BATCH,
+        "img_size": (96, 96, 16),
+        "feature_size": 16,
+        "hidden_size": 768,
+        "mlp_dim": 3072,
+        "num_heads": 12,
+        "pos_embed": "perceptron",
+        "norm_name": "instance",
+        "res_block": True,
+        "conv_block": True,
+        "dropout_rate": 0.0,
     }
 
-    model = UNet(**UNet_metadata).to(device)
+    model = UNETR(**UNETR_metadata).to(device)
+
     loss_function = DiceLoss(to_onehot_y=True, softmax=True)
     loss_type = "DiceLoss"
     optimizer = torch.optim.Adam(model.parameters(), 1e-4)
@@ -222,7 +240,8 @@ def get_model():
         }
 
     return (
-        UNet_metadata,
+        # UNet_metadata,
+        UNETR_metadata,
         Optimizer_metadata,
         model,
         optimizer,
@@ -243,7 +262,7 @@ def train(train_loader, val_loader, train_ds, val_ds, aim_run):
     post_label = Compose([AsDiscrete(to_onehot=2)])
 
     (
-        UNet_metadata,
+        UNETR_metadata,
         Optimizer_metadata,
         model,
         optimizer,
@@ -253,11 +272,11 @@ def train(train_loader, val_loader, train_ds, val_ds, aim_run):
     ) = get_model()
 
     # log model metadata
-    aim_run["UNet_metadata"] = UNet_metadata
+    aim_run["UNETR_metadata"] = UNETR_metadata
     # log optimizer metadata
     aim_run["Optimizer_metadata"] = Optimizer_metadata
 
-    slice_to_track = 80
+    slice_to_track = 50
 
     for epoch in range(max_epochs):
         print("-" * 10)
@@ -394,17 +413,17 @@ def run_pipeline():
     train_transforms, val_transforms = data_transforms()
     logger.info(train_files)
 
-    # train_ds = CacheDataset(
-    #     data=train_files, transform=train_transforms, cache_rate=0.05, num_workers=0
-    # )
-    train_ds = Dataset(data=train_files, transform=train_transforms)
-    train_loader = DataLoader(train_ds, batch_size=32, shuffle=True, num_workers=0)
+    train_ds = CacheDataset(
+        data=train_files, transform=train_transforms, cache_rate=1.0, num_workers=4
+    )
+    # train_ds = Dataset(data=train_files, transform=train_transforms)
+    train_loader = DataLoader(train_ds, batch_size=2, shuffle=True, num_workers=4)
 
-    # val_ds = CacheDataset(
-    #     data=val_files, transform=val_transforms, cache_rate=0.05, num_workers=0
-    # )
-    val_ds = Dataset(data=val_files, transform=val_transforms)
-    val_loader = DataLoader(val_ds, batch_size=1, num_workers=0)
+    val_ds = CacheDataset(
+        data=val_files, transform=val_transforms, cache_rate=1.0, num_workers=4
+    )
+    # val_ds = Dataset(data=val_files, transform=val_transforms)
+    val_loader = DataLoader(val_ds, batch_size=1, num_workers=4)
 
     # initialize a new Aim Run
     aim_run = aim.Run()
