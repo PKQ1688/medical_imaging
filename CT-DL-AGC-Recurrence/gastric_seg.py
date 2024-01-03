@@ -16,14 +16,14 @@ from monai.data import (
     DataLoader,
     CacheDataset,
     decollate_batch,
-    IterableDataset,
-    Dataset,
+    # IterableDataset,
+    # Dataset,
 )
 from monai.inferers import sliding_window_inference
 from monai.losses import DiceLoss
 from monai.metrics import DiceMetric
-from monai.networks.layers import Norm
-from monai.networks.nets import UNet, UNETR
+# from monai.networks.layers import Norm
+from monai.networks.nets import UNETR
 from monai.transforms import (
     AsDiscrete,
     EnsureChannelFirstd,
@@ -218,7 +218,8 @@ def get_model():
         "hidden_size": 768,
         "mlp_dim": 3072,
         "num_heads": 12,
-        "pos_embed": "perceptron",
+        # "pos_embed": "perceptron",
+        "proj_type": "conv",
         "norm_name": "instance",
         "res_block": True,
         "conv_block": True,
@@ -252,8 +253,8 @@ def get_model():
 
 
 def train(train_loader, val_loader, train_ds, val_ds, aim_run):
-    max_epochs = 600
-    val_interval = 10
+    max_epochs = 20
+    val_interval = 1
     best_metric = -1
     best_metric_epoch = -1
     epoch_loss_values = []
@@ -325,7 +326,8 @@ def train(train_loader, val_loader, train_ds, val_ds, aim_run):
                         val_data["image"].to(device),
                         val_data["label"].to(device),
                     )
-                    roi_size = (160, 160, 160)
+                    # roi_size = (160, 160, 160)
+                    roi_size = (96, 96, 16)
                     sw_batch_size = 4
                     val_outputs = sliding_window_inference(
                         val_inputs, roi_size, sw_batch_size, model
