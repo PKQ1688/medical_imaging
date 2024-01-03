@@ -17,11 +17,12 @@ from monai.data import (
     CacheDataset,
     decollate_batch,
     # IterableDataset,
-    # Dataset,
+    Dataset,
 )
 from monai.inferers import sliding_window_inference
 from monai.losses import DiceLoss
 from monai.metrics import DiceMetric
+
 # from monai.networks.layers import Norm
 from monai.networks.nets import UNETR
 from monai.transforms import (
@@ -37,7 +38,10 @@ from monai.transforms import (
 )
 from monai.utils import set_determinism
 
+from torch.cuda.amp import GradScaler,autocast
+
 # device = torch.device("cuda:0")
+scaler = GradScaler()
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
@@ -58,7 +62,8 @@ def load_data(data_dir):
     ]
     # print(len(data_dicts))
     # train_files, val_files = data_dicts[:-200], data_dicts[-200:]
-    train_files, val_files = data_dicts[:100], data_dicts[100:150]
+    train_files, val_files = data_dicts[:200], data_dicts[200:300]
+
     return train_files, val_files
 
 
@@ -253,8 +258,8 @@ def get_model():
 
 
 def train(train_loader, val_loader, train_ds, val_ds, aim_run):
-    max_epochs = 20
-    val_interval = 1
+    max_epochs = 600
+    val_interval = 10
     best_metric = -1
     best_metric_epoch = -1
     epoch_loss_values = []
@@ -292,10 +297,20 @@ def train(train_loader, val_loader, train_ds, val_ds, aim_run):
                 batch_data["label"].to(device),
             )
             optimizer.zero_grad()
-            outputs = model(inputs)
-            loss = loss_function(outputs, labels)
-            loss.backward()
-            optimizer.step()
+
+            with autocast():
+                outputs = model(inputs)
+                loss = loss_function(outputs, labels)
+
+            # loss.backward()
+            # optimizer.step()
+                
+            # 缩放损失并反向传播
+            scaler.scale(loss).backward()
+            # 调整比例和更新权重
+            scaler.step(optimizer)
+            scaler.update()
+            
             epoch_loss += loss.item()
             print(
                 f"{step}/{len(train_ds) // train_loader.batch_size}, "
@@ -415,17 +430,19 @@ def run_pipeline():
     train_transforms, val_transforms = data_transforms()
     logger.info(train_files)
 
-    train_ds = CacheDataset(
-        data=train_files, transform=train_transforms, cache_rate=1.0, num_workers=4
+    # train_ds = CacheDataset(
+    # data=train_files, transform=train_transforms, cache_rate=1.0, num_workers=4
+    # )
+    train_ds = Dataset(data=train_files, transform=train_transforms)
+    train_loader = DataLoader(
+        train_ds, batch_size=4, shuffle=True, num_workers=0, pin_memory=True
     )
-    # train_ds = Dataset(data=train_files, transform=train_transforms)
-    train_loader = DataLoader(train_ds, batch_size=2, shuffle=True, num_workers=4)
 
-    val_ds = CacheDataset(
-        data=val_files, transform=val_transforms, cache_rate=1.0, num_workers=4
-    )
-    # val_ds = Dataset(data=val_files, transform=val_transforms)
-    val_loader = DataLoader(val_ds, batch_size=1, num_workers=4)
+    # val_ds = CacheDataset(
+    # data=val_files, transform=val_transforms, cache_rate=1.0, num_workers=4
+    # )
+    val_ds = Dataset(data=val_files, transform=val_transforms)
+    val_loader = DataLoader(val_ds, batch_size=1, num_workers=0, pin_memory=True)
 
     # initialize a new Aim Run
     aim_run = aim.Run()
