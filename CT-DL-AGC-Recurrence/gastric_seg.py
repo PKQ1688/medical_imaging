@@ -38,7 +38,7 @@ from monai.transforms import (
 )
 from monai.utils import set_determinism
 
-from torch.cuda.amp import GradScaler,autocast
+from torch.cuda.amp import GradScaler, autocast
 
 # device = torch.device("cuda:0")
 scaler = GradScaler()
@@ -304,13 +304,13 @@ def train(train_loader, val_loader, train_ds, val_ds, aim_run):
 
             # loss.backward()
             # optimizer.step()
-                
+
             # 缩放损失并反向传播
             scaler.scale(loss).backward()
             # 调整比例和更新权重
             scaler.step(optimizer)
             scaler.update()
-            
+
             epoch_loss += loss.item()
             print(
                 f"{step}/{len(train_ds) // train_loader.batch_size}, "
@@ -430,19 +430,32 @@ def run_pipeline():
     train_transforms, val_transforms = data_transforms()
     logger.info(train_files)
 
-    # train_ds = CacheDataset(
-    # data=train_files, transform=train_transforms, cache_rate=1.0, num_workers=4
-    # )
-    train_ds = Dataset(data=train_files, transform=train_transforms)
+    from monai.data.utils import pad_list_data_collate
+
+    train_ds = CacheDataset(
+        data=train_files, transform=train_transforms, cache_rate=1.0, num_workers=0
+    )
+    # train_ds = Dataset(data=train_files, transform=train_transforms)
     train_loader = DataLoader(
-        train_ds, batch_size=4, shuffle=True, num_workers=0, pin_memory=True
+        train_ds,
+        batch_size=8,
+        shuffle=True,
+        num_workers=0,
+        pin_memory=True,
+        collate_fn=pad_list_data_collate,
     )
 
     # val_ds = CacheDataset(
-    # data=val_files, transform=val_transforms, cache_rate=1.0, num_workers=4
+    #     data=val_files, transform=val_transforms, cache_rate=0.5, num_workers=0
     # )
     val_ds = Dataset(data=val_files, transform=val_transforms)
-    val_loader = DataLoader(val_ds, batch_size=1, num_workers=0, pin_memory=True)
+    val_loader = DataLoader(
+        val_ds,
+        batch_size=4,
+        num_workers=0,
+        pin_memory=True,
+        collate_fn=pad_list_data_collate,
+    )
 
     # initialize a new Aim Run
     aim_run = aim.Run()
