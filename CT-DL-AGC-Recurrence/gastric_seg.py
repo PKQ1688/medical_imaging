@@ -61,8 +61,8 @@ def load_data(data_dir):
         for image_name, label_name in zip(train_images, train_labels)
     ]
     # print(len(data_dicts))
-    # train_files, val_files = data_dicts[:-200], data_dicts[-200:]
-    train_files, val_files = data_dicts[:200], data_dicts[200:300]
+    train_files, val_files = data_dicts[:-200], data_dicts[-200:]
+    # train_files, val_files = data_dicts[:600], data_dicts[600:700]
 
     return train_files, val_files
 
@@ -435,10 +435,10 @@ def run_pipeline():
     train_ds = CacheDataset(
         data=train_files, transform=train_transforms, cache_rate=1.0, num_workers=0
     )
-    # train_ds = Dataset(data=train_files, transform=train_transforms)
+    train_ds = Dataset(data=train_files, transform=train_transforms)
     train_loader = DataLoader(
         train_ds,
-        batch_size=8,
+        batch_size=4,
         shuffle=True,
         num_workers=0,
         pin_memory=True,
@@ -451,7 +451,7 @@ def run_pipeline():
     val_ds = Dataset(data=val_files, transform=val_transforms)
     val_loader = DataLoader(
         val_ds,
-        batch_size=4,
+        batch_size=2,
         num_workers=0,
         pin_memory=True,
         collate_fn=pad_list_data_collate,
