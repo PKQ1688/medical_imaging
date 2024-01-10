@@ -30,12 +30,26 @@ from monai.transforms import (
 )
 from monai.utils import set_determinism
 
-data_dir = "data/Tasks09_Spleen"
+# data_dir = "data/Task09_Spleen"
 
-train_images = sorted(glob.glob(os.path.join(data_dir, "imagesTr", "*.nii.gz")))
-train_labels = sorted(glob.glob(os.path.join(data_dir, "labelsTr", "*.nii.gz")))
-data_dicts = [{"image": image_name, "label": label_name} for image_name, label_name in zip(train_images, train_labels)]
-train_files, val_files = data_dicts[:-9], data_dicts[-9:]
+# train_images = sorted(glob.glob(os.path.join(data_dir, "imagesTr", "*.nii.gz")))
+# train_labels = sorted(glob.glob(os.path.join(data_dir, "labelsTr", "*.nii.gz")))
+# train_files, val_files = data_dicts[:-9], data_dicts[-9:]
+
+data_dir = "data/"
+train_images = sorted(glob.glob(os.path.join(data_dir, "ori_data", "*.nii.gz")))
+train_labels = sorted(glob.glob(os.path.join(data_dir, "roi", "*.nii.gz")))
+
+question_img_id = ["00200100","00205095","00206507"]
+question_img_list = [f"data/ori_data/{id}_Merge.nii.gz" for id in question_img_id]
+
+data_dicts = [
+    {"image": image_name, "label": label_name}
+    for image_name, label_name in zip(train_images, train_labels) if image_name not in question_img_list
+]
+train_files, val_files = data_dicts[:500], data_dicts[500:600]
+
+print(f"training samples: {len(train_files)}, validation samples: {len(val_files)}")
 
 set_determinism(seed=0)
 
@@ -53,11 +67,15 @@ train_transforms = Compose(
         ),
         CropForegroundd(keys=["image", "label"], source_key="image"),
         Orientationd(keys=["image", "label"], axcodes="RAS"),
-        Spacingd(keys=["image", "label"], pixdim=(1.5, 1.5, 2.0), mode=("bilinear", "nearest")),
+        Spacingd(
+            keys=["image", "label"],
+            pixdim=(1.5, 1.5, 2.0),
+            mode=("bilinear", "nearest"),
+        ),
         RandCropByPosNegLabeld(
             keys=["image", "label"],
             label_key="label",
-            spatial_size=(96, 96, 96),
+            spatial_size=(96, 96, 16),
             pos=1,
             neg=1,
             num_samples=4,
@@ -87,18 +105,26 @@ val_transforms = Compose(
         ),
         CropForegroundd(keys=["image", "label"], source_key="image"),
         Orientationd(keys=["image", "label"], axcodes="RAS"),
-        Spacingd(keys=["image", "label"], pixdim=(1.5, 1.5, 2.0), mode=("bilinear", "nearest")),
+        Spacingd(
+            keys=["image", "label"],
+            pixdim=(1.5, 1.5, 2.0),
+            mode=("bilinear", "nearest"),
+        ),
     ]
 )
 
-train_ds = CacheDataset(data=train_files, transform=train_transforms, cache_rate=1.0, num_workers=4)
+train_ds = CacheDataset(
+    data=train_files, transform=train_transforms, cache_rate=1.0, num_workers=4
+)
 # train_ds = monai.data.Dataset(data=train_files, transform=train_transforms)
 
 # use batch_size=2 to load images and use RandCropByPosNegLabeld
 # to generate 2 x 4 images for network training
-train_loader = DataLoader(train_ds, batch_size=2, shuffle=True, num_workers=4)
+train_loader = DataLoader(train_ds, batch_size=16, shuffle=True, num_workers=4)
 
-val_ds = CacheDataset(data=val_files, transform=val_transforms, cache_rate=1.0, num_workers=4)
+val_ds = CacheDataset(
+    data=val_files, transform=val_transforms, cache_rate=1.0, num_workers=4
+)
 # val_ds = Dataset(data=val_files, transform=val_transforms)
 val_loader = DataLoader(val_ds, batch_size=1, num_workers=4)
 
@@ -117,6 +143,7 @@ UNet_meatdata = {
 
 model = UNet(**UNet_meatdata).to(device)
 loss_function = DiceLoss(to_onehot_y=True, softmax=True)
+# loss_function = DiceLoss()
 loss_type = "DiceLoss"
 optimizer = torch.optim.Adam(model.parameters(), 1e-4)
 dice_metric = DiceMetric(include_background=False, reduction="mean")
@@ -164,7 +191,10 @@ for epoch in range(max_epochs):
         loss.backward()
         optimizer.step()
         epoch_loss += loss.item()
-        print(f"{step}/{len(train_ds) // train_loader.batch_size}, " f"train_loss: {loss.item():.4f}")
+        print(
+            f"{step}/{len(train_ds) // train_loader.batch_size}, "
+            f"train_loss: {loss.item():.4f}"
+        )
         # track batch loss metric
         aim_run.track(loss.item(), name="batch_loss", context={"type": loss_type})
 
@@ -190,20 +220,31 @@ for epoch in range(max_epochs):
                     val_data["image"].to(device),
                     val_data["label"].to(device),
                 )
-                roi_size = (160, 160, 160)
+                # roi_size = (160, 160, 160)
+                roi_size = (96, 96, 16)
                 sw_batch_size = 4
-                val_outputs = sliding_window_inference(val_inputs, roi_size, sw_batch_size, model)
+                val_outputs = sliding_window_inference(
+                    val_inputs, roi_size, sw_batch_size, model
+                )
 
                 # tracking input, label and output images with Aim
-                output = torch.argmax(val_outputs, dim=1)[0, :, :, slice_to_track].float()
+                output = torch.argmax(val_outputs, dim=1)[
+                    0, :, :, slice_to_track
+                ].float()
 
                 aim_run.track(
-                    aim.Image(val_inputs[0, 0, :, :, slice_to_track], caption=f"Input Image: {index}"),
+                    aim.Image(
+                        val_inputs[0, 0, :, :, slice_to_track],
+                        caption=f"Input Image: {index}",
+                    ),
                     name="validation",
                     context={"type": "input"},
                 )
                 aim_run.track(
-                    aim.Image(val_labels[0, 0, :, :, slice_to_track], caption=f"Label Image: {index}"),
+                    aim.Image(
+                        val_labels[0, 0, :, :, slice_to_track],
+                        caption=f"Label Image: {index}",
+                    ),
                     name="validation",
                     context={"type": "label"},
                 )
@@ -230,20 +271,34 @@ for epoch in range(max_epochs):
             if metric > best_metric:
                 best_metric = metric
                 best_metric_epoch = epoch + 1
-                torch.save(model.state_dict(), os.path.join("model", "best_metric_model.pth"))
+                torch.save(
+                    model.state_dict(), os.path.join("model", "best_metric_model.pth")
+                )
 
-                best_model_log_message = f"saved new best metric model at the {epoch + 1}th epoch"
-                aim_run.track(aim.Text(best_model_log_message), name="best_model_log_message", epoch=epoch + 1)
+                best_model_log_message = (
+                    f"saved new best metric model at the {epoch + 1}th epoch"
+                )
+                aim_run.track(
+                    aim.Text(best_model_log_message),
+                    name="best_model_log_message",
+                    epoch=epoch + 1,
+                )
                 print(best_model_log_message)
 
             message1 = f"current epoch: {epoch + 1} current mean dice: {metric:.4f}"
             message2 = f"\nbest mean dice: {best_metric:.4f} "
             message3 = f"at epoch: {best_metric_epoch}"
 
-            aim_run.track(aim.Text(message1 + "\n" + message2 + message3), name="epoch_summary", epoch=epoch + 1)
+            aim_run.track(
+                aim.Text(message1 + "\n" + message2 + message3),
+                name="epoch_summary",
+                epoch=epoch + 1,
+            )
             print(message1, message2, message3)
 
 # finalize Aim Run
 aim_run.close()
 
-print(f"train completed, best_metric: {best_metric:.4f} " f"at epoch: {best_metric_epoch}")
+print(
+    f"train completed, best_metric: {best_metric:.4f} " f"at epoch: {best_metric_epoch}"
+)

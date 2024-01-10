@@ -19,6 +19,7 @@ from monai.data import (
     # IterableDataset,
     Dataset,
 )
+import monai
 from monai.inferers import sliding_window_inference
 from monai.losses import DiceLoss
 from monai.metrics import DiceMetric
@@ -37,11 +38,12 @@ from monai.transforms import (
     Spacingd,
 )
 from monai.utils import set_determinism
+from torch.nn import DataParallel
 
-from torch.cuda.amp import GradScaler, autocast
+# from torch.cuda.amp import GradScaler, autocast
 
 # device = torch.device("cuda:0")
-scaler = GradScaler()
+# scaler = GradScaler()
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
@@ -50,18 +52,19 @@ def load_data(data_dir):
     Loads data from a local file
     """
     # 读取本地文件
-    train_images = sorted(glob.glob(os.path.join(data_dir, "ori_data", "*.nii.gz")))
-    train_labels = sorted(glob.glob(os.path.join(data_dir, "roi", "*.nii.gz")))
+    # train_images = sorted(glob.glob(os.path.join(data_dir, "ori_data", "*.nii.gz")))
+    # train_labels = sorted(glob.glob(os.path.join(data_dir, "roi", "*.nii.gz")))
 
-    # train_images = sorted(glob.glob(os.path.join(data_dir, "imagesTr", "*.nii.gz")))
-    # train_labels = sorted(glob.glob(os.path.join(data_dir, "labelsTr", "*.nii.gz")))
+    train_images = sorted(glob.glob(os.path.join(data_dir, "imagesTr", "*.nii.gz")))
+    train_labels = sorted(glob.glob(os.path.join(data_dir, "labelsTr", "*.nii.gz")))
 
     data_dicts = [
         {"image": image_name, "label": label_name}
         for image_name, label_name in zip(train_images, train_labels)
     ]
     # print(len(data_dicts))
-    train_files, val_files = data_dicts[:-200], data_dicts[-200:]
+    print(len(data_dicts))
+    train_files, val_files = data_dicts[:-9], data_dicts[-9:]
     # train_files, val_files = data_dicts[:600], data_dicts[600:700]
 
     return train_files, val_files
@@ -203,35 +206,36 @@ def data_transforms():
 
 
 def get_model():
-    # UNet_metadata = {
-    #     "spatial_dims": 3,
-    #     "in_channels": 1,
-    #     "out_channels": 2,
-    #     "channels": (16, 32, 64, 128, 256),
-    #     "strides": (2, 2, 2, 2),
-    #     "num_res_units": 2,
-    #     "norm": Norm.BATCH,
-    # }
-
-    # model = UNet(**UNet_metadata).to(device)
-
-    UNETR_metadata = {
+    UNet_metadata = {
+        "spatial_dims": 3,
         "in_channels": 1,
         "out_channels": 2,
-        "img_size": (96, 96, 16),
-        "feature_size": 16,
-        "hidden_size": 768,
-        "mlp_dim": 3072,
-        "num_heads": 12,
-        # "pos_embed": "perceptron",
-        "proj_type": "conv",
-        "norm_name": "instance",
-        "res_block": True,
-        "conv_block": True,
-        "dropout_rate": 0.0,
+        "channels": (16, 32, 64, 128, 256),
+        "strides": (2, 2, 2, 2),
+        "num_res_units": 2,
+        "norm": monai.networks.layers.Norm.BATCH,
     }
 
-    model = UNETR(**UNETR_metadata).to(device)
+    model = monai.networks.nets.UNet(**UNet_metadata).to(device)
+
+    # UNETR_metadata = {
+    #     "in_channels": 1,
+    #     "out_channels": 2,
+    #     "img_size": (96, 96, 16),
+    #     "feature_size": 16,
+    #     "hidden_size": 768,
+    #     "mlp_dim": 3072,
+    #     "num_heads": 12,
+    #     # "pos_embed": "perceptron",
+    #     "proj_type": "conv",
+    #     "norm_name": "instance",
+    #     "res_block": True,
+    #     "conv_block": True,
+    #     "dropout_rate": 0.0,
+    # }
+
+    # model = UNETR(**UNETR_metadata).to(device)
+    # model = DataParallel(model).cuda()
 
     loss_function = DiceLoss(to_onehot_y=True, softmax=True)
     loss_type = "DiceLoss"
@@ -246,8 +250,8 @@ def get_model():
         }
 
     return (
-        # UNet_metadata,
-        UNETR_metadata,
+        UNet_metadata,
+        # UNETR_metadata,
         Optimizer_metadata,
         model,
         optimizer,
@@ -257,7 +261,9 @@ def get_model():
     )
 
 
-def train(train_loader, val_loader, train_ds, val_ds, aim_run):
+def train(train_loader, val_loader, train_ds, val_ds, aim_run, amp=False):
+    scaler = torch.cuda.amp.GradScaler() if amp else None
+
     max_epochs = 600
     val_interval = 10
     best_metric = -1
@@ -298,18 +304,30 @@ def train(train_loader, val_loader, train_ds, val_ds, aim_run):
             )
             optimizer.zero_grad()
 
-            with autocast():
+            if amp and scaler is not None:
+                with torch.cuda.amp.autocast():
+                    outputs = model(inputs)
+                    loss = loss_function(outputs, labels)
+                scaler.scale(loss).backward()
+                scaler.step(optimizer)
+                scaler.update()
+            else:
                 outputs = model(inputs)
                 loss = loss_function(outputs, labels)
+                loss.backward()
+                optimizer.step()
+            # with autocast():
+            # outputs = model(inputs)
+            # loss = loss_function(outputs, labels)
 
             # loss.backward()
             # optimizer.step()
 
             # 缩放损失并反向传播
-            scaler.scale(loss).backward()
+            # scaler.scale(loss).backward()
             # 调整比例和更新权重
-            scaler.step(optimizer)
-            scaler.update()
+            # scaler.step(optimizer)
+            # scaler.update()
 
             epoch_loss += loss.item()
             print(
@@ -344,9 +362,18 @@ def train(train_loader, val_loader, train_ds, val_ds, aim_run):
                     # roi_size = (160, 160, 160)
                     roi_size = (96, 96, 16)
                     sw_batch_size = 4
-                    val_outputs = sliding_window_inference(
-                        val_inputs, roi_size, sw_batch_size, model
-                    )
+                    # val_outputs = sliding_window_inference(
+                    #     val_inputs, roi_size, sw_batch_size, model
+                    # )
+                    if amp:
+                        with torch.cuda.amp.autocast():
+                            val_outputs = sliding_window_inference(
+                                val_inputs, roi_size, sw_batch_size, model
+                            )
+                    else:
+                        val_outputs = sliding_window_inference(
+                            val_inputs, roi_size, sw_batch_size, model
+                        )
 
                     # tracking input, label and output images with Aim
                     output = torch.argmax(val_outputs, dim=1)[
@@ -424,8 +451,8 @@ def train(train_loader, val_loader, train_ds, val_ds, aim_run):
 def run_pipeline():
     set_determinism(seed=0)
     # data_dir = "data/data1207"
-    data_dir = "data/"
-    # data_dir = "data/Task09_Spleen"
+    # data_dir = "data/"
+    data_dir = "data/Task09_Spleen"
     train_files, val_files = load_data(data_dir)
     train_transforms, val_transforms = data_transforms()
     logger.info(train_files)
@@ -433,34 +460,34 @@ def run_pipeline():
     from monai.data.utils import pad_list_data_collate
 
     train_ds = CacheDataset(
-        data=train_files, transform=train_transforms, cache_rate=1.0, num_workers=0
+        data=train_files, transform=train_transforms, cache_rate=1.0, num_workers=8
     )
-    train_ds = Dataset(data=train_files, transform=train_transforms)
+    # train_ds = Dataset(data=train_files, transform=train_transforms)
     train_loader = DataLoader(
         train_ds,
         batch_size=4,
         shuffle=True,
         num_workers=0,
-        pin_memory=True,
-        collate_fn=pad_list_data_collate,
+        pin_memory=torch.cuda.is_available(),
+        # collate_fn=pad_list_data_collate,
     )
 
-    # val_ds = CacheDataset(
-    #     data=val_files, transform=val_transforms, cache_rate=0.5, num_workers=0
-    # )
-    val_ds = Dataset(data=val_files, transform=val_transforms)
+    val_ds = CacheDataset(
+        data=val_files, transform=val_transforms, cache_rate=1.0, num_workers=0
+    )
+    # val_ds = Dataset(data=val_files, transform=val_transforms)
     val_loader = DataLoader(
         val_ds,
-        batch_size=2,
+        batch_size=1,
         num_workers=0,
-        pin_memory=True,
-        collate_fn=pad_list_data_collate,
+        pin_memory=torch.cuda.is_available(),
+        # collate_fn=pad_list_data_collate,
     )
 
     # initialize a new Aim Run
     aim_run = aim.Run()
     best_metric, best_metric_epoch = train(
-        train_loader, val_loader, train_ds, val_ds, aim_run
+        train_loader, val_loader, train_ds, val_ds, aim_run, amp=True
     )
     aim_run.close()
     print(
