@@ -27,29 +27,39 @@ from monai.transforms import (
     RandCropByPosNegLabeld,
     ScaleIntensityRanged,
     Spacingd,
+    Resize,
 )
 from monai.utils import set_determinism
 
-# data_dir = "data/Task09_Spleen"
+#data_dir = "data/Task09_Spleen"
+data_dir = "data/temp_data"
 
-# train_images = sorted(glob.glob(os.path.join(data_dir, "imagesTr", "*.nii.gz")))
-# train_labels = sorted(glob.glob(os.path.join(data_dir, "labelsTr", "*.nii.gz")))
-# train_files, val_files = data_dicts[:-9], data_dicts[-9:]
-
-data_dir = "data/"
-train_images = sorted(glob.glob(os.path.join(data_dir, "ori_data", "*.nii.gz")))
-train_labels = sorted(glob.glob(os.path.join(data_dir, "roi", "*.nii.gz")))
-
-question_img_id = ["00200100","00205095","00206507"]
-question_img_list = [f"data/ori_data/{id}_Merge.nii.gz" for id in question_img_id]
+train_images = sorted(glob.glob(os.path.join(data_dir, "images", "*.nii.gz")))
+train_labels = sorted(glob.glob(os.path.join(data_dir, "labels", "*.nii.gz")))
 
 data_dicts = [
     {"image": image_name, "label": label_name}
-    for image_name, label_name in zip(train_images, train_labels) if image_name not in question_img_list
+    for image_name, label_name in zip(train_images, train_labels) 
 ]
-train_files, val_files = data_dicts[:500], data_dicts[500:600]
+train_files, val_files = data_dicts[:2], data_dicts[:2]
 
-print(f"training samples: {len(train_files)}, validation samples: {len(val_files)}")
+# data_dir = "data/"
+# train_images = sorted(glob.glob(os.path.join(data_dir, "ori_data", "*.nii.gz")))
+# train_labels = sorted(glob.glob(os.path.join(data_dir, "roi", "*.nii.gz")))
+
+# question_img_id = ["00200100","00205095","00206507"]
+# question_img_list = [f"data/ori_data/{id}_Merge.nii.gz" for id in question_img_id]
+
+# data_dicts = [
+#     {"image": image_name, "label": label_name}
+#     for image_name, label_name in zip(train_images, train_labels) if image_name not in question_img_list
+# ]
+
+
+# # train_files, val_files = data_dicts[:2000], data_dicts[2000:]
+# train_files, val_files = data_dicts[:200], data_dicts[200:300]
+
+# print(f"training samples: {len(train_files)}, validation samples: {len(val_files)}")
 
 set_determinism(seed=0)
 
@@ -67,15 +77,17 @@ train_transforms = Compose(
         ),
         CropForegroundd(keys=["image", "label"], source_key="image"),
         Orientationd(keys=["image", "label"], axcodes="RAS"),
+        # Orientationd(keys=["image", "label"], axcodes="LPS"),
+        # Resize(keys=["image", "label"] ,spatial_size=(512, 512, 128)),
         Spacingd(
             keys=["image", "label"],
-            pixdim=(1.5, 1.5, 2.0),
+            pixdim=(1.5, 1.5, 0.5),
             mode=("bilinear", "nearest"),
         ),
         RandCropByPosNegLabeld(
             keys=["image", "label"],
             label_key="label",
-            spatial_size=(96, 96, 16),
+            spatial_size=(96, 96, 96),
             pos=1,
             neg=1,
             num_samples=4,
@@ -105,9 +117,10 @@ val_transforms = Compose(
         ),
         CropForegroundd(keys=["image", "label"], source_key="image"),
         Orientationd(keys=["image", "label"], axcodes="RAS"),
+        # Orientationd(keys=["image", "label"], axcodes="LPS"),
         Spacingd(
             keys=["image", "label"],
-            pixdim=(1.5, 1.5, 2.0),
+            pixdim=(1.5, 1.5, 0.5),
             mode=("bilinear", "nearest"),
         ),
     ]
@@ -120,7 +133,7 @@ train_ds = CacheDataset(
 
 # use batch_size=2 to load images and use RandCropByPosNegLabeld
 # to generate 2 x 4 images for network training
-train_loader = DataLoader(train_ds, batch_size=16, shuffle=True, num_workers=4)
+train_loader = DataLoader(train_ds, batch_size=2, shuffle=True, num_workers=4)
 
 val_ds = CacheDataset(
     data=val_files, transform=val_transforms, cache_rate=1.0, num_workers=4
@@ -145,7 +158,7 @@ model = UNet(**UNet_meatdata).to(device)
 loss_function = DiceLoss(to_onehot_y=True, softmax=True)
 # loss_function = DiceLoss()
 loss_type = "DiceLoss"
-optimizer = torch.optim.Adam(model.parameters(), 1e-4)
+optimizer = torch.optim.Adam(model.parameters(), 1e-2)
 dice_metric = DiceMetric(include_background=False, reduction="mean")
 
 Optimizer_metadata = {}
@@ -165,13 +178,13 @@ post_pred = Compose([AsDiscrete(argmax=True, to_onehot=2)])
 post_label = Compose([AsDiscrete(to_onehot=2)])
 
 # initialize a new Aim Run
-aim_run = aim.Run()
+aim_run = aim.Run(experiment="2张图片进行测试")
 # log model metadata
 aim_run["UNet_meatdata"] = UNet_meatdata
 # log optimizer metadata
 aim_run["Optimizer_metadata"] = Optimizer_metadata
 
-slice_to_track = 80
+slice_to_track = 16
 
 for epoch in range(max_epochs):
     print("-" * 10)
@@ -220,8 +233,8 @@ for epoch in range(max_epochs):
                     val_data["image"].to(device),
                     val_data["label"].to(device),
                 )
-                # roi_size = (160, 160, 160)
-                roi_size = (96, 96, 16)
+                roi_size = (160, 160, 160)
+                # roi_size = (96, 96, 16)
                 sw_batch_size = 4
                 val_outputs = sliding_window_inference(
                     val_inputs, roi_size, sw_batch_size, model
