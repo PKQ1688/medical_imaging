@@ -27,45 +27,49 @@ from monai.transforms import (
     RandCropByPosNegLabeld,
     ScaleIntensityRanged,
     Spacingd,
-    Resize,
 )
 from monai.utils import set_determinism
 
-#data_dir = "data/Task09_Spleen"
-data_dir = "data/temp_data"
+device = torch.device("cuda") if torch.cuda.is_available() else "cpu"
 
-train_images = sorted(glob.glob(os.path.join(data_dir, "images", "*.nii.gz")))
-train_labels = sorted(glob.glob(os.path.join(data_dir, "labels", "*.nii.gz")))
+# data_dir = "data/Task09_Spleen"
+# data_dir = "data/temp_data"
 
-data_dicts = [
-    {"image": image_name, "label": label_name}
-    for image_name, label_name in zip(train_images, train_labels) 
-]
-train_files, val_files = data_dicts[:2], data_dicts[:2]
-
-# data_dir = "data/"
-# train_images = sorted(glob.glob(os.path.join(data_dir, "ori_data", "*.nii.gz")))
-# train_labels = sorted(glob.glob(os.path.join(data_dir, "roi", "*.nii.gz")))
-
-# question_img_id = ["00200100","00205095","00206507"]
-# question_img_list = [f"data/ori_data/{id}_Merge.nii.gz" for id in question_img_id]
+# train_images = sorted(glob.glob(os.path.join(data_dir, "imagesTr", "*.nii.gz")))
+# train_labels = sorted(glob.glob(os.path.join(data_dir, "labelsTr", "*.nii.gz")))
 
 # data_dicts = [
 #     {"image": image_name, "label": label_name}
-#     for image_name, label_name in zip(train_images, train_labels) if image_name not in question_img_list
+#     for image_name, label_name in zip(train_images, train_labels)
 # ]
+# train_files, val_files = data_dicts[:2], data_dicts[:2]
+
+data_dir = "data/"
+train_images = sorted(glob.glob(os.path.join(data_dir, "ori_data", "*.nii.gz")))
+train_labels = sorted(glob.glob(os.path.join(data_dir, "roi", "*.nii.gz")))
+
+question_img_id = ["00200100","00205095","00206507"]
+question_img_list = [f"data/ori_data/{id}_Merge.nii.gz" for id in question_img_id]
+
+data_dicts = [
+    {"image": image_name, "label": label_name}
+    for image_name, label_name in zip(train_images, train_labels) if image_name not in question_img_list
+]
 
 
-# # train_files, val_files = data_dicts[:2000], data_dicts[2000:]
-# train_files, val_files = data_dicts[:200], data_dicts[200:300]
+# train_files, val_files = data_dicts[:2000], data_dicts[2000:]
+train_files, val_files = data_dicts[:20], data_dicts[:20]
 
-# print(f"training samples: {len(train_files)}, validation samples: {len(val_files)}")
+print(f"training samples: {len(train_files)}, validation samples: {len(val_files)}")
 
 set_determinism(seed=0)
 
+# 0.5是放大图片,2.0是缩小。 只定向于第三位
+spacing = (1.5, 1.5, 0.5)
+
 train_transforms = Compose(
     [
-        LoadImaged(keys=["image", "label"]),
+        LoadImaged(keys=["image", "label"], image_only=False),
         EnsureChannelFirstd(keys=["image", "label"]),
         ScaleIntensityRanged(
             keys=["image"],
@@ -81,7 +85,7 @@ train_transforms = Compose(
         # Resize(keys=["image", "label"] ,spatial_size=(512, 512, 128)),
         Spacingd(
             keys=["image", "label"],
-            pixdim=(1.5, 1.5, 0.5),
+            pixdim=spacing,
             mode=("bilinear", "nearest"),
         ),
         RandCropByPosNegLabeld(
@@ -105,7 +109,7 @@ train_transforms = Compose(
 )
 val_transforms = Compose(
     [
-        LoadImaged(keys=["image", "label"]),
+        LoadImaged(keys=["image", "label"], image_only=False),
         EnsureChannelFirstd(keys=["image", "label"]),
         ScaleIntensityRanged(
             keys=["image"],
@@ -120,29 +124,29 @@ val_transforms = Compose(
         # Orientationd(keys=["image", "label"], axcodes="LPS"),
         Spacingd(
             keys=["image", "label"],
-            pixdim=(1.5, 1.5, 0.5),
+            pixdim=spacing,
             mode=("bilinear", "nearest"),
         ),
     ]
 )
 
 train_ds = CacheDataset(
-    data=train_files, transform=train_transforms, cache_rate=1.0, num_workers=4
+    data=train_files, transform=train_transforms, cache_rate=1.0, num_workers=0
 )
 # train_ds = monai.data.Dataset(data=train_files, transform=train_transforms)
 
 # use batch_size=2 to load images and use RandCropByPosNegLabeld
 # to generate 2 x 4 images for network training
-train_loader = DataLoader(train_ds, batch_size=2, shuffle=True, num_workers=4)
+train_loader = DataLoader(train_ds, batch_size=2, shuffle=True, num_workers=0)
 
 val_ds = CacheDataset(
-    data=val_files, transform=val_transforms, cache_rate=1.0, num_workers=4
+    data=val_files, transform=val_transforms, cache_rate=1.0, num_workers=0
 )
 # val_ds = Dataset(data=val_files, transform=val_transforms)
-val_loader = DataLoader(val_ds, batch_size=1, num_workers=4)
+val_loader = DataLoader(val_ds, batch_size=1, num_workers=0)
 
 # standard PyTorch program style: create UNet, DiceLoss and Adam optimizer
-device = torch.device("cuda:0")
+# device = torch.device("cuda:0")
 
 UNet_meatdata = {
     "spatial_dims": 3,
@@ -158,7 +162,7 @@ model = UNet(**UNet_meatdata).to(device)
 loss_function = DiceLoss(to_onehot_y=True, softmax=True)
 # loss_function = DiceLoss()
 loss_type = "DiceLoss"
-optimizer = torch.optim.Adam(model.parameters(), 1e-2)
+optimizer = torch.optim.Adam(model.parameters(), 5e-3)
 dice_metric = DiceMetric(include_background=False, reduction="mean")
 
 Optimizer_metadata = {}
