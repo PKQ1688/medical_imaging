@@ -58,7 +58,7 @@ data_dicts = [
 
 
 # train_files, val_files = data_dicts[:2000], data_dicts[2000:]
-train_files, val_files = data_dicts[:20], data_dicts[:20]
+train_files, val_files = data_dicts[:50], data_dicts[:50]
 
 print(f"training samples: {len(train_files)}, validation samples: {len(val_files)}")
 
@@ -80,8 +80,8 @@ train_transforms = Compose(
             clip=True,
         ),
         CropForegroundd(keys=["image", "label"], source_key="image"),
-        Orientationd(keys=["image", "label"], axcodes="RAS"),
-        # Orientationd(keys=["image", "label"], axcodes="LPS"),
+        # Orientationd(keys=["image", "label"], axcodes="RAS"),
+        Orientationd(keys=["image", "label"], axcodes="LPS"),
         # Resize(keys=["image", "label"] ,spatial_size=(512, 512, 128)),
         Spacingd(
             keys=["image", "label"],
@@ -120,8 +120,8 @@ val_transforms = Compose(
             clip=True,
         ),
         CropForegroundd(keys=["image", "label"], source_key="image"),
-        Orientationd(keys=["image", "label"], axcodes="RAS"),
-        # Orientationd(keys=["image", "label"], axcodes="LPS"),
+        # Orientationd(keys=["image", "label"], axcodes="RAS"),
+        Orientationd(keys=["image", "label"], axcodes="LPS"),
         Spacingd(
             keys=["image", "label"],
             pixdim=spacing,
@@ -162,7 +162,7 @@ model = UNet(**UNet_meatdata).to(device)
 loss_function = DiceLoss(to_onehot_y=True, softmax=True)
 # loss_function = DiceLoss()
 loss_type = "DiceLoss"
-optimizer = torch.optim.Adam(model.parameters(), 5e-3)
+optimizer = torch.optim.Adam(model.parameters(), 1e-2)
 dice_metric = DiceMetric(include_background=False, reduction="mean")
 
 Optimizer_metadata = {}

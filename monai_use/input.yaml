@@ -1,0 +1,10 @@
+# This is the YAML file " input . yaml "
+modality : CT
+datalist : "./dataset.json"
+dataroot : "/data/kits23"
+
+class_names :
+- {"name":"kidney_and_mass","index":[1 ,2 ,3]}
+- {"name":"mass","index":[2 ,3]}
+- {"name":"tumor","index":[2]}
+sigmoid : true
