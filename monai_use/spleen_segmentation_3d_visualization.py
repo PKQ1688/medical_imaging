@@ -32,33 +32,33 @@ from monai.utils import set_determinism
 
 device = torch.device("cuda") if torch.cuda.is_available() else "cpu"
 
-# data_dir = "data/Task09_Spleen"
+data_dir = "data/Task09_Spleen"
 # data_dir = "data/temp_data"
 
-# train_images = sorted(glob.glob(os.path.join(data_dir, "imagesTr", "*.nii.gz")))
-# train_labels = sorted(glob.glob(os.path.join(data_dir, "labelsTr", "*.nii.gz")))
-
-# data_dicts = [
-#     {"image": image_name, "label": label_name}
-#     for image_name, label_name in zip(train_images, train_labels)
-# ]
-# train_files, val_files = data_dicts[:2], data_dicts[:2]
-
-data_dir = "data/"
-train_images = sorted(glob.glob(os.path.join(data_dir, "ori_data", "*.nii.gz")))
-train_labels = sorted(glob.glob(os.path.join(data_dir, "roi", "*.nii.gz")))
-
-question_img_id = ["00200100","00205095","00206507"]
-question_img_list = [f"data/ori_data/{id}_Merge.nii.gz" for id in question_img_id]
+train_images = sorted(glob.glob(os.path.join(data_dir, "imagesTr", "*.nii.gz")))
+train_labels = sorted(glob.glob(os.path.join(data_dir, "labelsTr", "*.nii.gz")))
 
 data_dicts = [
     {"image": image_name, "label": label_name}
-    for image_name, label_name in zip(train_images, train_labels) if image_name not in question_img_list
+    for image_name, label_name in zip(train_images, train_labels)
 ]
+train_files, val_files = data_dicts[:20], data_dicts[:20]
+
+# data_dir = "data/"
+# train_images = sorted(glob.glob(os.path.join(data_dir, "ori_data", "*.nii.gz")))
+# train_labels = sorted(glob.glob(os.path.join(data_dir, "roi", "*.nii.gz")))
+#
+# question_img_id = ["00200100","00205095","00206507"]
+# question_img_list = [f"data/ori_data/{id}_Merge.nii.gz" for id in question_img_id]
+#
+# data_dicts = [
+#     {"image": image_name, "label": label_name}
+#     for image_name, label_name in zip(train_images, train_labels) if image_name not in question_img_list
+# ]
 
 
 # train_files, val_files = data_dicts[:2000], data_dicts[2000:]
-train_files, val_files = data_dicts[:50], data_dicts[:50]
+# train_files, val_files = data_dicts[:50], data_dicts[:50]
 
 print(f"training samples: {len(train_files)}, validation samples: {len(val_files)}")
 
