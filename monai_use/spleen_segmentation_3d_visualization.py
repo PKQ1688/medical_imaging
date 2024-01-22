@@ -48,12 +48,13 @@ data_dir = "data/"
 train_images = sorted(glob.glob(os.path.join(data_dir, "ori_data", "*.nii.gz")))
 train_labels = sorted(glob.glob(os.path.join(data_dir, "roi", "*.nii.gz")))
 
-question_img_id = ["00200100","00205095","00206507"]
+question_img_id = ["00200100", "00205095", "00206507", "00163639"]
 question_img_list = [f"data/ori_data/{id}_Merge.nii.gz" for id in question_img_id]
 
 data_dicts = [
     {"image": image_name, "label": label_name}
-    for image_name, label_name in zip(train_images, train_labels) if image_name not in question_img_list
+    for image_name, label_name in zip(train_images, train_labels)
+    if image_name not in question_img_list
 ]
 
 
@@ -162,7 +163,7 @@ model = UNet(**UNet_meatdata).to(device)
 loss_function = DiceLoss(to_onehot_y=True, softmax=True)
 # loss_function = DiceLoss()
 loss_type = "DiceLoss"
-optimizer = torch.optim.AdamW(model.parameters(), 1e-3)
+optimizer = torch.optim.AdamW(model.parameters(), 1e-4)
 dice_metric = DiceMetric(include_background=False, reduction="mean")
 
 Optimizer_metadata = {}

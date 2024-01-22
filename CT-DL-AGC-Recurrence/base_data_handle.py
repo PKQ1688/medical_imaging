@@ -124,7 +124,7 @@ def handle_all_data(origin_dicom_path, roi_data_path, output_data_path):
 
 if __name__ == "__main__":
     handle_all_data(
-        origin_dicom_path=f"data/ori_dcm",
-        roi_data_path=f"data/roi/",
-        output_data_path=f"data/ori_data",
+        origin_dicom_path=f"data/Task100/ori_dcm/",
+        roi_data_path=f"data/Task100/roi/",
+        output_data_path=f"data/Task100/ori_data/",
     )
