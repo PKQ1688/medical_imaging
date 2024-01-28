@@ -29,6 +29,7 @@ from monai.transforms import (
     Spacingd,
 )
 from monai.utils import set_determinism
+import monai
 
 device = torch.device("cuda") if torch.cuda.is_available() else "cpu"
 
@@ -44,9 +45,9 @@ device = torch.device("cuda") if torch.cuda.is_available() else "cpu"
 # ]
 # train_files, val_files = data_dicts[:20], data_dicts[:20]
 
-data_dir = "data/Task100"
+data_dir = "data/Task400"
 train_images = sorted(glob.glob(os.path.join(data_dir, "ori_data", "*.nii.gz")))
-train_labels = sorted(glob.glob(os.path.join(data_dir, "roi", "*.nii.gz")))
+train_labels = sorted(glob.glob(os.path.join(data_dir, "ROI400", "*.nii.gz")))
 
 # question_img_id = ["00200100", "00205095", "00206507", "00163639"]
 # question_img_list = [f"data/ori_data/{id}_Merge.nii.gz" for id in question_img_id]
@@ -56,10 +57,11 @@ data_dicts = [
     for image_name, label_name in zip(train_images, train_labels)
     # if image_name not in question_img_list
 ]
-print(data_dicts)
+print(len(data_dicts))
+# exit()
 
 # train_files, val_files = data_dicts[:2000], data_dicts[2000:]
-train_files, val_files = data_dicts[:1], data_dicts[:1]
+train_files, val_files = data_dicts[:320], data_dicts[320:]
 
 print(f"training samples: {len(train_files)}, validation samples: {len(val_files)}")
 
@@ -132,18 +134,19 @@ val_transforms = Compose(
 )
 
 train_ds = CacheDataset(
-    data=train_files, transform=train_transforms, cache_rate=1.0, num_workers=0
+    data=train_files, transform=train_transforms, cache_rate=0.3, num_workers=0
 )
+
 # train_ds = monai.data.Dataset(data=train_files, transform=train_transforms)
 
 # use batch_size=2 to load images and use RandCropByPosNegLabeld
 # to generate 2 x 4 images for network training
 train_loader = DataLoader(train_ds, batch_size=2, shuffle=True, num_workers=0)
 
-val_ds = CacheDataset(
-    data=val_files, transform=val_transforms, cache_rate=1.0, num_workers=0
-)
-# val_ds = Dataset(data=val_files, transform=val_transforms)
+# val_ds = CacheDataset(
+    # data=val_files, transform=val_transforms, cache_rate=1.0, num_workers=0
+# )
+val_ds = monai.data.Dataset(data=val_files, transform=val_transforms)
 val_loader = DataLoader(val_ds, batch_size=1, num_workers=0)
 
 # standard PyTorch program style: create UNet, DiceLoss and Adam optimizer
