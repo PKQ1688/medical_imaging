@@ -97,6 +97,7 @@ def handle_all_data(origin_dicom_path, roi_data_path, output_data_path):
             dicom_directory = dicom_directory_v2
         else:
             logger.error(f"dicom_directory:{dicom_directory_v1} not in dicom_list")
+            logger.error(f"dicom_directory:{dicom_directory_v2} not in dicom_list")
 
         pattern = r"\d+"  # 匹配一个或多个数字
         dicom_num = re.findall(pattern, dicom_directory)
@@ -124,7 +125,7 @@ def handle_all_data(origin_dicom_path, roi_data_path, output_data_path):
 
 if __name__ == "__main__":
     handle_all_data(
-        origin_dicom_path=f"data/Task100/ori_dcm/",
-        roi_data_path=f"data/Task100/roi/",
-        output_data_path=f"data/Task100/ori_data/",
+        origin_dicom_path=f"data/Task400/data400/",
+        roi_data_path=f"data/Task400/ROI400/",
+        output_data_path=f"data/Task400/ori_data/",
     )
