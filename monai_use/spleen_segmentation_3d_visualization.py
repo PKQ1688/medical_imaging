@@ -30,6 +30,7 @@ from monai.transforms import (
 )
 from monai.utils import set_determinism
 import monai
+from torch.nn import DataParallel
 
 device = torch.device("cuda") if torch.cuda.is_available() else "cpu"
 
@@ -45,9 +46,9 @@ device = torch.device("cuda") if torch.cuda.is_available() else "cpu"
 # ]
 # train_files, val_files = data_dicts[:20], data_dicts[:20]
 
-data_dir = "data/Task400"
+data_dir = "data/Task100"
 train_images = sorted(glob.glob(os.path.join(data_dir, "ori_data", "*.nii.gz")))
-train_labels = sorted(glob.glob(os.path.join(data_dir, "ROI400", "*.nii.gz")))
+train_labels = sorted(glob.glob(os.path.join(data_dir, "roi", "*.nii.gz")))
 
 # question_img_id = ["00200100", "00205095", "00206507", "00163639"]
 # question_img_list = [f"data/ori_data/{id}_Merge.nii.gz" for id in question_img_id]
@@ -61,7 +62,7 @@ print(len(data_dicts))
 # exit()
 
 # train_files, val_files = data_dicts[:2000], data_dicts[2000:]
-train_files, val_files = data_dicts[:320], data_dicts[320:]
+train_files, val_files = data_dicts[:80], data_dicts[80:]
 
 print(f"training samples: {len(train_files)}, validation samples: {len(val_files)}")
 
@@ -72,7 +73,9 @@ spacing = (1.5, 1.5, 0.5)
 
 train_transforms = Compose(
     [
-        LoadImaged(keys=["image", "label"], image_only=False),
+        LoadImaged(keys=["image", "label"]),
+        # LoadImaged(keys=["image"],reader="itkreader"),
+        # LoadImaged(keys=["label"]),
         EnsureChannelFirstd(keys=["image", "label"]),
         ScaleIntensityRanged(
             keys=["image"],
@@ -83,8 +86,8 @@ train_transforms = Compose(
             clip=True,
         ),
         CropForegroundd(keys=["image", "label"], source_key="image"),
-        # Orientationd(keys=["image", "label"], axcodes="RAS"),
-        Orientationd(keys=["image", "label"], axcodes="LPS"),
+        Orientationd(keys=["image", "label"], axcodes="RAS"),
+        # Orientationd(keys=["image", "label"], axcodes="LPS"),
         # Resize(keys=["image", "label"] ,spatial_size=(512, 512, 128)),
         Spacingd(
             keys=["image", "label"],
@@ -112,7 +115,9 @@ train_transforms = Compose(
 )
 val_transforms = Compose(
     [
-        LoadImaged(keys=["image", "label"], image_only=False),
+        LoadImaged(keys=["image", "label"]),
+        # LoadImaged(keys=["image"],reader="itkreader"),
+        # LoadImaged(keys=["label"]),
         EnsureChannelFirstd(keys=["image", "label"]),
         ScaleIntensityRanged(
             keys=["image"],
@@ -123,8 +128,8 @@ val_transforms = Compose(
             clip=True,
         ),
         CropForegroundd(keys=["image", "label"], source_key="image"),
-        # Orientationd(keys=["image", "label"], axcodes="RAS"),
-        Orientationd(keys=["image", "label"], axcodes="LPS"),
+        Orientationd(keys=["image", "label"], axcodes="RAS"),
+        # Orientationd(keys=["image", "label"], axcodes="LPS"),
         Spacingd(
             keys=["image", "label"],
             pixdim=spacing,
@@ -134,20 +139,20 @@ val_transforms = Compose(
 )
 
 train_ds = CacheDataset(
-    data=train_files, transform=train_transforms, cache_rate=1.0, num_workers=4
+    data=train_files, transform=train_transforms, cache_rate=1.0, num_workers=8
 )
 
 # train_ds = monai.data.Dataset(data=train_files, transform=train_transforms)
 
 # use batch_size=2 to load images and use RandCropByPosNegLabeld
 # to generate 2 x 4 images for network training
-train_loader = DataLoader(train_ds, batch_size=8, shuffle=True,num_workers=4)
+train_loader = DataLoader(train_ds, batch_size=16, shuffle=True,num_workers=4)
 
 val_ds = CacheDataset(
-    data=val_files, transform=val_transforms, cache_rate=1.0,num_workers=4
+    data=val_files, transform=val_transforms, cache_rate=1.0,num_workers=0
 )
 # val_ds = monai.data.Dataset(data=val_files, transform=val_transforms)
-val_loader = DataLoader(val_ds, batch_size=1,num_workers=4)
+val_loader = DataLoader(val_ds, batch_size=1)
 
 # standard PyTorch program style: create UNet, DiceLoss and Adam optimizer
 # device = torch.device("cuda:0")
@@ -162,7 +167,14 @@ UNet_meatdata = {
     "norm": Norm.BATCH,
 }
 
-model = UNet(**UNet_meatdata).to(device)
+model = UNet(**UNet_meatdata)
+if torch.cuda.device_count() > 1:
+    print("Let's use", torch.cuda.device_count(), "GPUs!")
+    # 使用DataParallel来包装你的模型
+    model = DataParallel(model)
+
+model.to(device)
+
 loss_function = DiceLoss(to_onehot_y=True, softmax=True)
 # loss_function = DiceLoss()
 loss_type = "DiceLoss"
@@ -176,7 +188,7 @@ for ind, param_group in enumerate(optimizer.param_groups):
         key: value for (key, value) in param_group.items() if "params" not in key
     }
 
-max_epochs = 400
+max_epochs = 600
 val_interval = 10
 best_metric = -1
 best_metric_epoch = -1
@@ -242,7 +254,7 @@ for epoch in range(max_epochs):
                     val_data["label"].to(device),
                 )
                 roi_size = (160, 160, 160)
-                # roi_size = (96, 96, 16)
+                # roi_size = (96, 96, 96)
                 sw_batch_size = 4
                 val_outputs = sliding_window_inference(
                     val_inputs, roi_size, sw_batch_size, model

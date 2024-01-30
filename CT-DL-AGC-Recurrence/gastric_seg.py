@@ -44,7 +44,7 @@ from torch.nn import DataParallel
 
 # device = torch.device("cuda:0")
 # scaler = GradScaler()
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+device = torch.device("cuda:2" if torch.cuda.is_available() else "cpu")
 
 
 def load_data(data_dir):
@@ -52,20 +52,24 @@ def load_data(data_dir):
     Loads data from a local file
     """
     # 读取本地文件
-    # train_images = sorted(glob.glob(os.path.join(data_dir, "ori_data", "*.nii.gz")))
-    # train_labels = sorted(glob.glob(os.path.join(data_dir, "roi", "*.nii.gz")))
+    train_images = sorted(glob.glob(os.path.join(data_dir, "ori_dcm","*")))
+    train_labels = sorted(glob.glob(os.path.join(data_dir, "roi", "*.nii.gz")))
 
-    train_images = sorted(glob.glob(os.path.join(data_dir, "imagesTr", "*.nii.gz")))
-    train_labels = sorted(glob.glob(os.path.join(data_dir, "labelsTr", "*.nii.gz")))
+    # print(train_images)
+    # exit()
+    # train_images = sorted(glob.glob(os.path.join(data_dir, "imagesTr", "*.nii.gz")))
+    # train_labels = sorted(glob.glob(os.path.join(data_dir, "labelsTr", "*.nii.gz")))
 
     data_dicts = [
         {"image": image_name, "label": label_name}
         for image_name, label_name in zip(train_images, train_labels)
     ]
     # print(len(data_dicts))
-    print(len(data_dicts))
-    train_files, val_files = data_dicts[:-9], data_dicts[-9:]
+    # print(len(data_dicts))
+    train_files, val_files = data_dicts[:2], data_dicts[:2]
     # train_files, val_files = data_dicts[:600], data_dicts[600:700]
+    logger.info(f"train_files: {train_files}")
+    logger.info(f"val_files: {len(val_files)}")
 
     return train_files, val_files
 
@@ -73,7 +77,9 @@ def load_data(data_dir):
 def data_transforms():
     train_transforms = Compose(
         [
-            LoadImaged(keys=["image", "label"]),
+            # LoadImaged(keys=["image", "label"]),
+            LoadImaged(keys=["image"],reader="itkreader"),
+            LoadImaged(keys=["label"]),
             EnsureChannelFirstd(keys=["image", "label"]),
             ScaleIntensityRanged(
                 keys=["image"],
@@ -95,8 +101,7 @@ def data_transforms():
             RandCropByPosNegLabeld(
                 keys=["image", "label"],
                 label_key="label",
-                # spatial_size=(96, 96, 96),
-                spatial_size=(96, 96, 16),
+                spatial_size=(96, 96, 96),
                 pos=1,
                 neg=1,
                 num_samples=4,
@@ -107,7 +112,9 @@ def data_transforms():
     )
     val_transforms = Compose(
         [
-            LoadImaged(keys=["image", "label"]),
+            # LoadImaged(keys=["image", "label"]),
+            LoadImaged(keys=["image"],reader="itkreader"),
+            LoadImaged(keys=["label"]),
             EnsureChannelFirstd(keys=["image", "label"]),
             ScaleIntensityRanged(
                 keys=["image"],
@@ -123,7 +130,7 @@ def data_transforms():
             Orientationd(keys=["image", "label"], axcodes="RAI"),
             Spacingd(
                 keys=["image", "label"],
-                pixdim=(1.5, 1.5, 2.0),
+                pixdim=(1.5, 1.5, 0.5),
                 mode=("bilinear", "nearest"),
             ),
         ]
@@ -452,34 +459,35 @@ def run_pipeline():
     set_determinism(seed=0)
     # data_dir = "data/data1207"
     # data_dir = "data/"
-    data_dir = "data/Task09_Spleen"
+    # data_dir = "data/Task09_Spleen"
+    data_dir = "data/Task100"
     train_files, val_files = load_data(data_dir)
     train_transforms, val_transforms = data_transforms()
     logger.info(train_files)
 
-    from monai.data.utils import pad_list_data_collate
+    # from monai.data.utils import pad_list_data_collate
 
     train_ds = CacheDataset(
-        data=train_files, transform=train_transforms, cache_rate=1.0, num_workers=8
+        data=train_files, transform=train_transforms, cache_rate=1.0
     )
     # train_ds = Dataset(data=train_files, transform=train_transforms)
     train_loader = DataLoader(
         train_ds,
-        batch_size=4,
+        batch_size=2,
         shuffle=True,
-        num_workers=0,
+        # num_workers=0,
         pin_memory=torch.cuda.is_available(),
         # collate_fn=pad_list_data_collate,
     )
 
     val_ds = CacheDataset(
-        data=val_files, transform=val_transforms, cache_rate=1.0, num_workers=0
+        data=val_files, transform=val_transforms, cache_rate=1.0
     )
     # val_ds = Dataset(data=val_files, transform=val_transforms)
     val_loader = DataLoader(
         val_ds,
         batch_size=1,
-        num_workers=0,
+        # num_workers=0,
         pin_memory=torch.cuda.is_available(),
         # collate_fn=pad_list_data_collate,
     )
