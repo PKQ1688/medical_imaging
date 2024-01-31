@@ -189,7 +189,7 @@ for ind, param_group in enumerate(optimizer.param_groups):
     }
 
 max_epochs = 600
-val_interval = 10
+val_interval = 1
 best_metric = -1
 best_metric_epoch = -1
 epoch_loss_values = []
@@ -290,7 +290,11 @@ for epoch in range(max_epochs):
                 val_outputs = [post_pred(i) for i in decollate_batch(val_outputs)]
                 val_labels = [post_label(i) for i in decollate_batch(val_labels)]
                 # compute metric for current iteration
-                dice_metric(y_pred=val_outputs, y=val_labels)
+                if val_inputs[0].size() == val_labels[0].size():
+                    dice_metric(y_pred=val_outputs, y=val_labels)
+                else:
+                    print('error test loader')
+                    print(index)
 
             # aggregate the final mean dice result
             metric = dice_metric.aggregate().item()
