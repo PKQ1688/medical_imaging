@@ -27,7 +27,9 @@ def readdcm(filepath):
 file_root = 'data/Task100/ori_dcm/'
 
 file_list = os.listdir(file_root)
-print(file_list)
+# print(file_list)
+# file_list = ["00435155V","00435804V","00435838V","00436000V"]
+
 for img_name in file_list:
     #if img_name.endswith('.dcm'):
     dcm_path = file_root + img_name
@@ -38,4 +40,3 @@ for img_name in file_list:
     # 将图像保存为.nii.gz格式
     sitk.WriteImage(dcm_images,
                     os.path.join('data/Task100/ori_data/', '{}.nii.gz'.format(dcm_path.split("/")[-1].split(".")[0])))
-    # break

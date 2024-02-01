@@ -30,6 +30,7 @@ from monai.transforms import (
 )
 from monai.utils import set_determinism
 from torch.nn import DataParallel
+from monai.data.utils import pad_list_data_collate
 
 device = torch.device("cuda") if torch.cuda.is_available() else "cpu"
 
@@ -151,7 +152,7 @@ val_ds = CacheDataset(
     data=val_files, transform=val_transforms, cache_rate=1.0, num_workers=0
 )
 # val_ds = monai.data.Dataset(data=val_files, transform=val_transforms)
-val_loader = DataLoader(val_ds, batch_size=2)
+val_loader = DataLoader(val_ds, batch_size=2,collate_fn=pad_list_data_collate)
 
 # standard PyTorch program style: create UNet, DiceLoss and Adam optimizer
 # device = torch.device("cuda:0")
@@ -188,7 +189,7 @@ for ind, param_group in enumerate(optimizer.param_groups):
     }
 
 max_epochs = 600
-val_interval = 1
+val_interval = 10
 best_metric = -1
 best_metric_epoch = -1
 epoch_loss_values = []
@@ -289,7 +290,7 @@ for epoch in range(max_epochs):
                 val_outputs = [post_pred(i) for i in decollate_batch(val_outputs)]
                 val_labels = [post_label(i) for i in decollate_batch(val_labels)]
                 # compute metric for current iteration
-                if val_inputs[0].size() == val_labels[0].size():
+                if val_outputs[0].size() == val_labels[0].size():
                     dice_metric(y_pred=val_outputs, y=val_labels)
                 else:
                     print("error test loader")
