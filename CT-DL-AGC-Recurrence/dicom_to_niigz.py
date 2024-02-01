@@ -1,5 +1,7 @@
-import SimpleITK as sitk
 import os
+
+import SimpleITK as sitk
+
 
 def readdcm(filepath):
     # 创建一个SimpleITK的图像系列阅读器
@@ -18,10 +20,11 @@ def readdcm(filepath):
 
     return images
 
-dcm_path = r'F:\test'
-save_path = 'datafile/400data/datas/'
 
-file_root = 'datafile/400data/data400/' 
+# dcm_path = "data/Task400/data400"
+# save_path = 'data/Task400/'
+
+file_root = 'data/Task100/ori_dcm/'
 
 file_list = os.listdir(file_root)
 print(file_list)
@@ -33,4 +36,6 @@ for img_name in file_list:
      # 调用readdcm函数读取DICOM图像
     dcm_images = readdcm(dcm_path)
     # 将图像保存为.nii.gz格式
-    sitk.WriteImage(dcm_images, os.path.join('{}.nii.gz'.format(dcm_path)))
+    sitk.WriteImage(dcm_images,
+                    os.path.join('data/Task100/ori_data/', '{}.nii.gz'.format(dcm_path.split("/")[-1].split(".")[0])))
+    # break

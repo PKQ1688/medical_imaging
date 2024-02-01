@@ -29,7 +29,6 @@ from monai.transforms import (
     Spacingd,
 )
 from monai.utils import set_determinism
-import monai
 from torch.nn import DataParallel
 
 device = torch.device("cuda") if torch.cuda.is_available() else "cpu"
@@ -69,7 +68,7 @@ print(f"training samples: {len(train_files)}, validation samples: {len(val_files
 set_determinism(seed=0)
 
 # 0.5是放大图片,2.0是缩小。 只定向于第三位
-spacing = (1.5, 1.5, 0.5)
+spacing = (1.5, 1.5, 0.8)
 
 train_transforms = Compose(
     [
@@ -146,13 +145,13 @@ train_ds = CacheDataset(
 
 # use batch_size=2 to load images and use RandCropByPosNegLabeld
 # to generate 2 x 4 images for network training
-train_loader = DataLoader(train_ds, batch_size=16, shuffle=True,num_workers=4)
+train_loader = DataLoader(train_ds, batch_size=16, shuffle=True, num_workers=4)
 
 val_ds = CacheDataset(
-    data=val_files, transform=val_transforms, cache_rate=1.0,num_workers=0
+    data=val_files, transform=val_transforms, cache_rate=1.0, num_workers=0
 )
 # val_ds = monai.data.Dataset(data=val_files, transform=val_transforms)
-val_loader = DataLoader(val_ds, batch_size=1)
+val_loader = DataLoader(val_ds, batch_size=2)
 
 # standard PyTorch program style: create UNet, DiceLoss and Adam optimizer
 # device = torch.device("cuda:0")
@@ -293,7 +292,7 @@ for epoch in range(max_epochs):
                 if val_inputs[0].size() == val_labels[0].size():
                     dice_metric(y_pred=val_outputs, y=val_labels)
                 else:
-                    print('error test loader')
+                    print("error test loader")
                     print(index)
 
             # aggregate the final mean dice result
