@@ -69,7 +69,7 @@ print(f"training samples: {len(train_files)}, validation samples: {len(val_files
 set_determinism(seed=0)
 
 # 0.5是放大图片,2.0是缩小。 只定向于第三位
-spacing = (1.5, 1.5, 0.8)
+spacing = (2.0, 2.0, 1.5)
 
 train_transforms = Compose(
     [
@@ -162,7 +162,7 @@ train_ds = CacheDataset(data=train_files, transform=train_transforms, cache_rate
 
 # use batch_size=2 to load images and use RandCropByPosNegLabeld
 # to generate 2 x 4 images for network training
-train_loader = DataLoader(train_ds, batch_size=4, shuffle=True, num_workers=4)
+train_loader = DataLoader(train_ds, batch_size=8, shuffle=True, num_workers=4)
 
 val_ds = CacheDataset(data=val_files, transform=val_transforms, cache_rate=1.0, num_workers=4)
 # val_ds = Dataset(data=val_files, transform=val_transforms)
@@ -189,7 +189,7 @@ model.to(device)
 loss_function = DiceLoss(to_onehot_y=True, softmax=True)
 # loss_function = DiceLoss()
 loss_type = "DiceLoss"
-optimizer = torch.optim.Adam(model.parameters(), 1e-4)
+optimizer = torch.optim.Adam(model.parameters(), 2e-4)
 dice_metric = DiceMetric(include_background=False, reduction="mean")
 
 Optimizer_metadata = {}
@@ -199,7 +199,7 @@ for ind, param_group in enumerate(optimizer.param_groups):
         key: value for (key, value) in param_group.items() if "params" not in key
     }
 
-max_epochs = 1800
+max_epochs = 800
 val_interval = 10
 best_metric = -1
 best_metric_epoch = -1
