@@ -1,10 +1,5 @@
-opencv-python
-tqdm
+lightning
+torchvision
+seaborn
 pydicom
-monai
 nibabel
-Pillow
-matplotlib
-aim
-SimpleITK
-pyyaml

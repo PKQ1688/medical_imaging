@@ -1,0 +1,10 @@
+opencv-python
+tqdm
+pydicom
+monai
+nibabel
+Pillow
+matplotlib
+aim
+SimpleITK
+pyyaml
