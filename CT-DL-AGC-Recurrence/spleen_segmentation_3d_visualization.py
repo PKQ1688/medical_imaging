@@ -30,6 +30,7 @@ from monai.transforms import (
 )
 from monai.utils import set_determinism
 from torch.nn import DataParallel
+from monai.data.utils import pad_list_data_collate
 
 device = torch.device("cuda") if torch.cuda.is_available() else "cpu"
 
@@ -68,7 +69,7 @@ print(f"training samples: {len(train_files)}, validation samples: {len(val_files
 set_determinism(seed=0)
 
 # 0.5是放大图片,2.0是缩小。 只定向于第三位
-spacing = (1.5, 1.5, 0.8)
+spacing = (2.0, 2.0, 1.5)
 
 train_transforms = Compose(
     [
@@ -137,24 +138,35 @@ val_transforms = Compose(
     ]
 )
 
-train_ds = CacheDataset(
-    data=train_files, transform=train_transforms, cache_rate=1.0, num_workers=8
-)
+# train_ds = CacheDataset(
+#     data=train_files, transform=train_transforms, cache_rate=1.0, num_workers=8
+# )
 
+# # train_ds = monai.data.Dataset(data=train_files, transform=train_transforms)
+
+# # use batch_size=2 to load images and use RandCropByPosNegLabeld
+# # to generate 2 x 4 images for network training
+# train_loader = DataLoader(train_ds, batch_size=16, shuffle=True, num_workers=4)
+
+# val_ds = CacheDataset(
+#     data=val_files, transform=val_transforms, cache_rate=1.0, num_workers=0
+# )
+# # val_ds = monai.data.Dataset(data=val_files, transform=val_transforms)
+# val_loader = DataLoader(val_ds, batch_size=2,collate_fn=pad_list_data_collate)
+
+# standard PyTorch program style: create UNet, DiceLoss and Adam optimizer
+# device = torch.device("cuda:0")
+
+train_ds = CacheDataset(data=train_files, transform=train_transforms, cache_rate=1.0, num_workers=4)
 # train_ds = monai.data.Dataset(data=train_files, transform=train_transforms)
 
 # use batch_size=2 to load images and use RandCropByPosNegLabeld
 # to generate 2 x 4 images for network training
-train_loader = DataLoader(train_ds, batch_size=16, shuffle=True, num_workers=4)
+train_loader = DataLoader(train_ds, batch_size=8, shuffle=True, num_workers=4)
 
-val_ds = CacheDataset(
-    data=val_files, transform=val_transforms, cache_rate=1.0, num_workers=0
-)
-# val_ds = monai.data.Dataset(data=val_files, transform=val_transforms)
-val_loader = DataLoader(val_ds, batch_size=2)
-
-# standard PyTorch program style: create UNet, DiceLoss and Adam optimizer
-# device = torch.device("cuda:0")
+val_ds = CacheDataset(data=val_files, transform=val_transforms, cache_rate=1.0, num_workers=4)
+# val_ds = Dataset(data=val_files, transform=val_transforms)
+val_loader = DataLoader(val_ds, batch_size=1, num_workers=4)
 
 UNet_meatdata = {
     "spatial_dims": 3,
@@ -177,7 +189,7 @@ model.to(device)
 loss_function = DiceLoss(to_onehot_y=True, softmax=True)
 # loss_function = DiceLoss()
 loss_type = "DiceLoss"
-optimizer = torch.optim.AdamW(model.parameters(), 1e-4)
+optimizer = torch.optim.Adam(model.parameters(), 2e-4)
 dice_metric = DiceMetric(include_background=False, reduction="mean")
 
 Optimizer_metadata = {}
@@ -187,8 +199,8 @@ for ind, param_group in enumerate(optimizer.param_groups):
         key: value for (key, value) in param_group.items() if "params" not in key
     }
 
-max_epochs = 600
-val_interval = 1
+max_epochs = 800
+val_interval = 10
 best_metric = -1
 best_metric_epoch = -1
 epoch_loss_values = []
@@ -238,7 +250,7 @@ for epoch in range(max_epochs):
 
     print(f"epoch {epoch + 1} average loss: {epoch_loss:.4f}")
 
-    if (epoch + 1) % val_interval == 0:
+    if (epoch + 1) % val_interval == 0 or epoch == 0:
         if (epoch + 1) % val_interval * 2 == 0:
             # track model params and gradients
             track_params_dists(model, aim_run)
@@ -248,6 +260,7 @@ for epoch in range(max_epochs):
         model.eval()
         with torch.no_grad():
             for index, val_data in enumerate(val_loader):
+
                 val_inputs, val_labels = (
                     val_data["image"].to(device),
                     val_data["label"].to(device),
@@ -289,7 +302,7 @@ for epoch in range(max_epochs):
                 val_outputs = [post_pred(i) for i in decollate_batch(val_outputs)]
                 val_labels = [post_label(i) for i in decollate_batch(val_labels)]
                 # compute metric for current iteration
-                if val_inputs[0].size() == val_labels[0].size():
+                if val_outputs[0].size() == val_labels[0].size():
                     dice_metric(y_pred=val_outputs, y=val_labels)
                 else:
                     print("error test loader")
