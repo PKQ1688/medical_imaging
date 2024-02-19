@@ -5,34 +5,16 @@
 # @Email        : adolf1321794021@gmail.com
 # @LastEditTime : 2024/2/18 17:39
 # @File         : data_handle.py
+# from pydicom.pixel_data_handlers.util import apply_voi_lut
+import dicom2jpg
 import nibabel as nib
 import numpy as np
-import pydicom
+# import pydicom
 from PIL import Image
-from pydicom.pixel_data_handlers.util import apply_voi_lut
 
 
 def dicom_to_png(dicom_path, output_path):
-    ds = pydicom.dcmread(dicom_path)
-    if 'PixelData' in ds:
-        # 使用GDCM处理JPEG扩展压缩的DICOM文件
-        from pydicom.pixel_data_handlers import gdcm_handler as handler
-        if handler.is_available():
-            try:
-                pixel_array = ds.pixel_array  # 使用GDCM读取像素数组
-                # 应用VOI LUT（如果存在）
-                pixel_array = apply_voi_lut(pixel_array, ds)
-                # 转换为PIL图像并保存
-                from PIL import Image
-                image = Image.fromarray(pixel_array)
-                image.save(output_path)
-                print(f"Image saved to {output_path}")
-            except Exception as e:
-                print(f"Error converting DICOM to PNG: {e}")
-        else:
-            print("GDCM is not available. Please install it to process this DICOM file.")
-    else:
-        print("No PixelData found in DICOM file.")
+    dicom2jpg.dicom2png(dicom_path, output_path)
 
 
 def nii_to_png(nii_path, png_path, slice_index=-1):
