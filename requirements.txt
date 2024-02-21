@@ -1,5 +1,3 @@
-lightning
 torchvision
-seaborn
-pydicom
-nibabel
+Pillow
+opencv-python
