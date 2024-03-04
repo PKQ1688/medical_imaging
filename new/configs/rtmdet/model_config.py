@@ -7,7 +7,7 @@
 # @File         : model_config.py
 _base_ = './rtmdet_tiny_8xb32-300e_coco.py'
 
-data_root = 'data/res_data/' # dataset root
+data_root = 'data/res_data/'  # dataset root
 
 train_batch_size_per_gpu = 4
 train_num_workers = 2
