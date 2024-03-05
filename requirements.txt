@@ -1,3 +1,6 @@
 torchvision
 Pillow
 opencv-python
+nibabel
+pydicom
+pyarrow

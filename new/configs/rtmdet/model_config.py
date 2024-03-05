@@ -46,7 +46,7 @@ val_evaluator = dict(ann_file=data_root + 'ct_dataset.json')
 
 test_evaluator = val_evaluator
 
-model = dict(bbox_head=dict(num_classes=1))
+model = dict(bbox_head=dict(num_classes=2))
 
 # learning rate
 param_scheduler = [

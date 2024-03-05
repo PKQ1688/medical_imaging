@@ -158,12 +158,20 @@ def adjust_image_orientation():
         # break
 
 
-def get_coco_annotation():
+def get_coco_annotation(is_train=True):
     # image_paths = ['data/res_data/origin/1V_28.png', 'data/res_data/origin/1V_29.png', 'data/res_data/origin/1V_30.png']
     # mask_paths = ['data/res_data/mask/1V_28.png', 'data/res_data/mask/1V_29.png', 'data/res_data/mask/1V_30.png']
     # pass
     image_paths = sorted(os.listdir("data/res_data/origin/"))
     mask_paths = sorted(os.listdir("data/res_data/mask/"))
+
+    # print(len(image_paths))
+    if is_train:
+        image_paths = image_paths[:2500]
+        mask_paths = mask_paths[:2500]
+    else:
+        image_paths = image_paths[2500:]
+        mask_paths = mask_paths[2500:]
 
     # for a,b in zip(image_paths, mask_paths):
     #     assert a == b
@@ -221,8 +229,14 @@ def get_coco_annotation():
         })
 
     # 保存为JSON文件
-    with open('data/res_data/ct_dataset.json', 'w') as f:
-        json.dump(coco_dataset, f, indent=4)
+    if is_train:
+        with open('data/res_data/ct_dataset_train.json', 'w') as f:
+            json.dump(coco_dataset, f, indent=4)
+    else:
+        with open('data/res_data/ct_dataset_val.json', 'w') as f:
+            json.dump(coco_dataset, f, indent=4)
+    # with open('data/res_data/ct_dataset.json', 'w') as f:
+    #     json.dump(coco_dataset, f, indent=4)
 
 
 # 验证标注是否正确
