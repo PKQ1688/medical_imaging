@@ -284,5 +284,5 @@ def validate_annotation():
 if __name__ == '__main__':
     # get_use_data()
     # adjust_image_orientation()
-    get_coco_annotation()
+    get_coco_annotation(is_train=False)
     # validate_annotation()
