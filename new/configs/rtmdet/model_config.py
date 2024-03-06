@@ -14,7 +14,7 @@ train_num_workers = 2
 
 max_epochs = 20
 stage2_num_epochs = 1
-base_lr = 0.00008
+base_lr = 0.00005
 
 
 metainfo = {
