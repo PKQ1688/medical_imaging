@@ -21,6 +21,7 @@ metainfo = {
     'classes': ('adca', 'SRCC',),
     'palette': [
         (220, 20, 60),
+        (220, 20, 60),
     ]
 }
 
@@ -31,18 +32,18 @@ train_dataloader = dict(
         data_root=data_root,
         metainfo=metainfo,
         data_prefix=dict(img='origin/'),
-        ann_file='ct_dataset.json'))
+        ann_file='ct_dataset_train.json'))
 
 val_dataloader = dict(
     dataset=dict(
         data_root=data_root,
         metainfo=metainfo,
         data_prefix=dict(img='origin/'),
-        ann_file='ct_dataset.json'))
+        ann_file='ct_dataset_val.json'))
 
 test_dataloader = val_dataloader
 
-val_evaluator = dict(ann_file=data_root + 'ct_dataset.json')
+val_evaluator = dict(ann_file=data_root + 'ct_dataset_val.json')
 
 test_evaluator = val_evaluator
 
@@ -106,7 +107,7 @@ custom_hooks = [
 ]
 
 # load COCO pre-trained weight
-load_from = './checkpoints/rtmdet_tiny_8xb32-300e_coco_20220902_112414-78e30dcc.pth'
+load_from = 'checkpoints/rtmdet_tiny_8xb32-300e_coco_20220902_112414-78e30dcc.pth'
 
 train_cfg = dict(type='EpochBasedTrainLoop', max_epochs=max_epochs, val_interval=1)
 visualizer = dict(vis_backends=[dict(type='LocalVisBackend'),dict(type='TensorboardVisBackend')])
