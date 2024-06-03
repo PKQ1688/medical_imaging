@@ -41,16 +41,25 @@ def main(tempdir):
     logging.basicConfig(stream=sys.stdout, level=logging.INFO)
 
     # create a temporary directory and 40 random image, mask pairs
-    print(f"generating synthetic data to {tempdir} (this may take a while)")
-    for i in range(40):
-        im, seg = create_test_image_2d(128, 128, num_seg_classes=1)
-        Image.fromarray((im * 255).astype("uint8")).save(os.path.join(tempdir, f"img{i:d}.png"))
-        Image.fromarray((seg * 255).astype("uint8")).save(os.path.join(tempdir, f"seg{i:d}.png"))
+    # print(f"generating synthetic data to {tempdir} (this may take a while)")
+    # for i in range(40):
+    #     im, seg = create_test_image_2d(128, 128, num_seg_classes=1)
+    #     Image.fromarray((im * 255).astype("uint8")).save(os.path.join(tempdir, f"img{i:d}.png"))
+    #     Image.fromarray((seg * 255).astype("uint8")).save(os.path.join(tempdir, f"seg{i:d}.png"))
 
-    images = sorted(glob(os.path.join(tempdir, "img*.png")))
-    segs = sorted(glob(os.path.join(tempdir, "seg*.png")))
-    train_files = [{"img": img, "seg": seg} for img, seg in zip(images[:20], segs[:20])]
-    val_files = [{"img": img, "seg": seg} for img, seg in zip(images[-20:], segs[-20:])]
+    # images = sorted(glob(os.path.join(tempdir, "img*.png")))
+    # segs = sorted(glob(os.path.join(tempdir, "seg*.png")))
+
+    data_dir = "res_data"
+    images = sorted(glob(os.path.join(data_dir, "origin_v2", "*.png")))
+    segs = sorted(glob(os.path.join(data_dir, "mask_v2", "*.png")))
+
+    # print(images)
+    # print(segs)
+    # exit()
+
+    train_files = [{"img": img, "seg": seg} for img, seg in zip(images[:2], segs[:2])]
+    val_files = [{"img": img, "seg": seg} for img, seg in zip(images[:2], segs[:2])]
 
     # define transforms for image and segmentation
     train_transforms = Compose(
@@ -84,7 +93,7 @@ def main(tempdir):
     # use batch_size=2 to load images and use RandCropByPosNegLabeld to generate 2 x 4 images for network training
     train_loader = DataLoader(
         train_ds,
-        batch_size=2,
+        batch_size=64,
         shuffle=True,
         num_workers=4,
         collate_fn=list_data_collate,
@@ -92,7 +101,7 @@ def main(tempdir):
     )
     # create a validation data loader
     val_ds = monai.data.Dataset(data=val_files, transform=val_transforms)
-    val_loader = DataLoader(val_ds, batch_size=1, num_workers=4, collate_fn=list_data_collate)
+    val_loader = DataLoader(val_ds, batch_size=16, num_workers=4, collate_fn=list_data_collate)
     dice_metric = DiceMetric(include_background=True, reduction="mean", get_not_nans=False)
     post_trans = Compose([Activations(sigmoid=True), AsDiscrete(threshold=0.5)])
     # create UNet, DiceLoss and Adam optimizer
@@ -115,9 +124,10 @@ def main(tempdir):
     epoch_loss_values = list()
     metric_values = list()
     writer = SummaryWriter()
-    for epoch in range(10):
+    all_epoch = 600
+    for epoch in range(all_epoch):
         print("-" * 10)
-        print(f"epoch {epoch + 1}/{10}")
+        print(f"epoch {epoch + 1}/{all_epoch}")
         model.train()
         epoch_loss = 0
         step = 0
@@ -131,7 +141,8 @@ def main(tempdir):
             optimizer.step()
             epoch_loss += loss.item()
             epoch_len = len(train_ds) // train_loader.batch_size
-            print(f"{step}/{epoch_len}, train_loss: {loss.item():.4f}")
+            if step % 10 == 0:
+                print(f"{step}/{epoch_len}, train_loss: {loss.item():.4f}")
             writer.add_scalar("train_loss", loss.item(), epoch_len * epoch + step)
         epoch_loss /= step
         epoch_loss_values.append(epoch_loss)

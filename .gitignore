@@ -166,3 +166,14 @@ data1207/
 model/
 checkpoints/
 work_dirs/
+res_data/
+test_data/
+test_data_origin/
+runs/
+
+use_huggingface/segformer-b0-finetuned-segments-sidewalk-outputs/
+use_huggingface/maskformer-swin-base-ade/
+use_huggingface/mit-b0/
+final_checkpoint/
+
+best_metric_model_segmentation2d_dict.pth

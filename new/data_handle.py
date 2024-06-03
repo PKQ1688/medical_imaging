@@ -132,19 +132,19 @@ def nii_to_png(nii_path, png_path):
 
 
 def get_png_data():
-    dicom_data_path = "data/862CT/862-data/"
+    dicom_data_path = "test_data/"
     dicom_data_path_list = os.listdir(dicom_data_path)
 
     for dicom_name in tqdm(dicom_data_path_list, total=len(dicom_data_path_list)):
         # print(dicom_name)
-        # dicom_to_png(
-        #     f"data/862CT/862-data/{dicom_name}/",
-        #     f"data/862CT/res_data/origin_img/{dicom_name}/",
-        # )
-        nii_to_png(
-            f"data/862CT/862roi/{dicom_name}_Merge.nii.gz",
-            f"data/862CT/res_data/mask_img/{dicom_name}/",
+        dicom_to_png(
+            f"test_data/{dicom_name}/",
+            f"test_data_origin/{dicom_name}/",
         )
+        # nii_to_png(
+        #     f"data/862CT/862roi/{dicom_name}_Merge.nii.gz",
+        #     f"data/862CT/res_data/mask_img/{dicom_name}/",
+        # )
         # break
 
 
@@ -339,10 +339,25 @@ def validate_annotation():
     # 显示图片
     img.show()
 
+def handel_infer_data():
+    img_lists = []
+    for root, dirs, files in os.walk('test_data_origin/'):
+        for file in files:
+            if file.lower().endswith('.png'):
+                img_lists.append(os.path.join(root, file))
+    # print(img_lists)
+    for img_path in tqdm(img_lists,total=len(img_lists)):
+        img = cv2.imread(img_path)
+        cv2.imwrite(img_path, img)
+
+
 
 if __name__ == "__main__":
     # get_png_data()
     # get_use_data()
     # adjust_image_orientation()
     # get_coco_annotation(is_train=True)
-    validate_annotation()
+    # validate_annotation()
+    # handel_infer_data()
+    img = cv2.imread('test_data_origin/52v/7-38.png')
+    print(img.shape)
