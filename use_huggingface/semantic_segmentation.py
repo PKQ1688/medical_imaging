@@ -44,6 +44,16 @@ def load_images_and_masks(data_dir):
     images = sorted(glob.glob(os.path.join(data_dir, "origin", "*.png")))
     segs = sorted(glob.glob(os.path.join(data_dir, "mask_v2", "*.png")))
 
+    images_v2 = sorted(glob.glob(os.path.join(data_dir, "use_origin", "*.png")))
+    segs_v2 = sorted(glob.glob(os.path.join(data_dir, "use_mask_v2", "*.png")))
+
+    images += images_v2
+    segs += segs_v2
+
+    # import pdb
+    # pdb.set_trace()
+    assert len(images) == len(segs)
+
     for img_path in images:
         img = Image.open(img_path)
         images_list.append(img)
